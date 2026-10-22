@@ -627,9 +627,17 @@ export function createStage(container, hooks = {}) {
       ? { cells: demo.cells, lastMove: null, winLine: demo.winLine }
       : { cells: current.cells, lastMove: current.lastMove, winLine: current.winLine };
 
+  // What the board has finished drawing, for automated tests: 42 cells,
+  // bottom row first, R / Y / "."; `data-settled` is "false" mid-animation.
+  function publish(settled) {
+    container.dataset.settled = String(settled);
+    if (settled) container.dataset.board = shownCells().map((c) => (c === "p1" ? "R" : c === "p2" ? "Y" : ".")).join("");
+  }
+
   async function sync() {
     if (syncing || current === null) return;
     syncing = true;
+    publish(false);
     try {
       for (;;) {
         const want = wanted();
@@ -650,6 +658,7 @@ export function createStage(container, hooks = {}) {
         if (added.length === 0) {
           decorate(want);
           celebrate(want);
+          publish(true);
           return;
         }
         clearDecorations();
@@ -888,9 +897,10 @@ export function createStage(container, hooks = {}) {
     preview(col) {
       aim(col);
     },
+    /// The first press shows the ghost over the middle column.
     nudge(delta) {
       if (!playable()) return;
-      aim(Math.min(COLS - 1, Math.max(0, (hoverCol ?? 3) + delta)));
+      aim(hoverCol === null ? 3 : Math.min(COLS - 1, Math.max(0, hoverCol + delta)));
     },
     dropSelected() {
       drop(hoverCol);
