@@ -25,46 +25,23 @@ frontend or bot at `https://<backend-id>.raw.icp0.io/semantics`.
 
 ## Canisters
 
-| Canister | Id                            | State                                                                 |
-| -------- | ----------------------------- | --------------------------------------------------------------------- |
-| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | Live; module `29f5b4a2…` in hosty.live's store, verified; play-tested |
-| frontend | `cj766-haaaa-aaaau-ahgeq-cai` | Asset module installed; page **not uploaded yet** (see below)         |
+| Canister | Id                            |                                                    |
+| -------- | ----------------------------- | -------------------------------------------------- |
+| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | module `29f5b4a2…`, in hosty.live's store, verified |
+| frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/        |
 
-Both are controlled by the owner's hosty.live account. The page will be
-at `https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/`. The game is unlisted
-until its frontend is registered on the
+Both are controlled by the owner's hosty.live account. The game is
+unlisted until its frontend is registered on the
 [Duel dashboard](https://n6plc-4yaaa-aaaaj-qshia-cai.icp.net/).
 
-### Finishing the frontend
-
-On 2026-10-22 the frontend canister refused to grow its memory by the
-8 MB that authorising the hosty.live builder needs (`IC0532`, "cannot
-grow memory … due to insufficient cycles"). Topping up does not close
-the gap: every top-up raised the requirement by most of the amount added
-(0.74 T held → ~0.77 T asked, 1.08 → ~1.15, 1.18 → ~1.23). It holds
-1.18 T now. Don't add more cycles to it; retry only the authorisation
-later, in a hosty.live deploy session:
-
-1. `hosty_get_canister_status { canisterId: "cj766-haaaa-aaaau-ahgeq-cai", fresh: true }`
-   for the balance, then `hosty_setup_frontend_canister` on the same id
-   (it now only authorises the builder). If it is refused again for
-   cycles, stop: the alternative is a frontend canister on another
-   subnet.
-2. `cd frontend && npm run build && zip -r dist.zip dist -x "*.map"`.
-3. `hosty_prepare_zip_upload { canisterId: "cj766-haaaa-aaaau-ahgeq-cai",
-   pureAssets: true, outputDir: "dist", canisterEnv: { set:
-   { "PUBLIC_CANISTER_ID:backend": "co6yk-kyaaa-aaaau-ahgea-cai" } } }`,
-   run its `curl` from `frontend/`, `hosty_wait_for_deployment`.
-4. Check the cookie, then the page:
-
-   ```bash
-   curl -sI https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/ | grep -o 'ID%3Abackend%3D[a-z0-9%D-]*cai'
-   (cd frontend && node browser-test.mjs https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/)
-   ```
-
-The backend sits on the same subnet. It passed the play-test there, but
-keep an eye on its cycles (`hosty_get_canister_status`) as its memory
-grows with use.
+**Cycles and the freezing threshold.** Both canisters were created with
+a 365-day freezing threshold, and on their subnet that made the
+frontend refuse to grow its memory (`IC0532`, "cannot grow memory … due
+to insufficient cycles") however much it was topped up. Resetting it in
+the hosty.live web app set 30 days, and it worked at once. The backend
+still has 365 days: if its update calls ever fail with `IC0532`, lower
+its freezing threshold rather than adding cycles, and don't reset it,
+which would wipe its tables. Check both with `hosty_get_canister_status`.
 
 ## Layout
 
