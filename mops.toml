@@ -1,0 +1,14 @@
+[package]
+name = "connect-four"
+version = "0.1.0"
+description = "connect-four — a duel-game-core game"
+
+[dependencies]
+# duel-game-core is not on mops.one yet: clone https://github.com/research-ag/duel-core
+# next to this repository (see README.md, "Build").
+duel-game-core = "../duel-core/backend"
+core = "2.6.2"
+promtracker = "1.0.2" # metrics at GET /metrics, wired by the Host template
+
+[toolchain]
+moc = "2.0.0"
