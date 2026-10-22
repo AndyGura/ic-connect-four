@@ -1,0 +1,5 @@
+/* __GAME_TITLE__-specific visuals, layered on duel-game-core.css (loaded
+ * first), which supplies the page chrome and the custom properties --bg,
+ * --panel, --panel-2, --line, --ink, --muted, --accent, --red, --green,
+ * --blue. build.js copies this file verbatim; it may stay empty.
+ */

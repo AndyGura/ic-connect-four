@@ -1,0 +1,150 @@
+/// __RULES_MODULE__ — __GAME_TITLE__ game logic, as a pure module.
+///
+/// `#simultaneous`: both seats act every round. For a game where the
+/// rules decide whose turn it is (chess, checkers, a card game with a
+/// draw-then-place turn) build `#turnBased { checkOptions; init; toMove;
+/// move; view }` instead — see references/turn-based-games.md.
+///
+/// Seats: #p1 = __P1_NAME__, #p2 = __P2_NAME__ (display only).
+///
+/// Rules:
+///   __ONE LINE PER MOVE/RULE, PLAIN ENGLISH — replace this block with the
+///   actual rules text.__
+
+import TP "mo:duel-game-core";
+
+module {
+
+  /// Served at `GET /semantics`: everything a frontend author who cannot
+  /// see this file needs. Keep the section names; replace their bodies
+  /// (SKILL.md step 3). No `"` or `\` inside without escaping.
+  public let SEMANTICS : Text = "GAME: __GAME_TITLE__
+MODE: simultaneous
+SEATS: p1 = __P1_NAME__, p2 = __P2_NAME__
+OPTIONS: none (type Options = record {})
+
+VIEW (Candid)
+  type View = record { ... };
+  What every field means: indexing, units, what null stands for, and
+  what a seat does not get to see.
+
+ACTION (Candid)
+  type Action = variant { ... };
+
+RULES
+  What each action does, and every condition that gets it rejected.
+
+ENDINGS
+  Every way the game is won, lost or drawn.
+
+CLIENT NOTES
+  What a UI must know that the view does not say outright.
+";
+
+  /// The raw decision only — never a value the server can derive from
+  /// State (SKILL.md step 2).
+  public type Action = { /* #yourMove; #anotherMove; ... */ };
+
+  /// Per-seat state that persists across rounds. Immutable.
+  public type Side = {
+    // your per-player fields
+  };
+
+  /// Optional narration of the previous round.
+  public type Round = {
+    p1Action : Action;
+    p2Action : Action;
+  };
+
+  public type State = {
+    p1 : Side;
+    p2 : Side;
+    lastRound : ?Round;
+    // For a rules variant picked at table time (SKILL.md step 2, question 8):
+    // variant : Variant;
+  };
+
+  /// What one seat sees. `State` when nothing is hidden; otherwise its
+  /// own record, built by `view` (a hand of cards: your own face up, the
+  /// opponent's as a count).
+  public type View = State;
+
+  /// What a table's creator picks. `{}` for a game without options.
+  public type Options = {};
+  // public type Variant = { #classic; #yourOtherVariant };
+  // public type Options = { variant : Variant; roundsToWin : Nat };
+
+  /// null = sensible; ?reason = the table is refused (`#badOptions`).
+  public func checkOptions(_ : Options) : ?Text = null;
+  // public func checkOptions(o : Options) : ?Text {
+  //   if (o.roundsToWin < 1 or o.roundsToWin > 9) ?"Rounds to win must be 1 to 9." else null;
+  // };
+
+  // Fixed game numbers go here as `let`s, not as Action/State fields.
+
+  public func sideName(seat : TP.Seat) : Text = switch (seat) {
+    case (#p1) "__P1_NAME__";
+    case (#p2) "__P2_NAME__";
+  };
+
+  func freshSide() : Side = {
+    // starting values
+  };
+
+  /// The starting position for these options. `rng` is the framework's
+  /// random-number generator (`rng.below(n)`, `rng.shuffle(xs)`); rename
+  /// to `_rng` if unused.
+  public func init(_ : Options, _rng : TP.Rng) : State = {
+    p1 = freshSide();
+    p2 = freshSide();
+    lastRound = null;
+    // variant = options.variant;
+  };
+
+  /// null = legal. The only legality gate in the system; the frontend's
+  /// disabled buttons are cosmetic.
+  public func validate(s : State, seat : TP.Seat, a : Action) : ?Text {
+    let me = switch (seat) { case (#p1) s.p1; case (#p2) s.p2 };
+    switch (a) {
+      // case (#yourMove) if (illegal) ?"reason" else null;
+      // case (#yourMove) if (s.variant == #classic) ?"yourMove is not available in classic mode" else null;
+      case (_) null;
+    };
+  };
+
+  /// Both moves are in and already validated. Guard every Nat
+  /// subtraction against underflow.
+  public func resolve(s : State, a1 : Action, a2 : Action, _rng : TP.Rng)
+    : { state : State; verdict : ?TP.Verdict } {
+
+    // let verdict : ?TP.Verdict =
+    //   if (p1Won and p2Won) ?#draw
+    //   else if (p1Won) ?#p1Wins
+    //   else if (p2Won) ?#p2Wins
+    //   else null;
+
+    {
+      state = {
+        p1 = s.p1;
+        p2 = s.p2;
+        lastRound = ?{ p1Action = a1; p2Action = a2 };
+        // variant = s.variant;
+      };
+      verdict = null;
+    };
+  };
+
+  /// What `seat` sees of `s`; `over` is true once the game has ended, when
+  /// a game with hidden information reveals it.
+  public func view(s : State, _seat : TP.Seat, _over : Bool) : View = s;
+
+  /// The functions the framework calls. Never stored by it: the host hands
+  /// `spec` in on every call.
+  public let spec : TP.Spec<State, Action, View, Options> = #simultaneous {
+    checkOptions;
+    init;
+    validate;
+    resolve;
+    view;
+  };
+};

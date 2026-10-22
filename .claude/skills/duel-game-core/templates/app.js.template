@@ -1,0 +1,40 @@
+// Bootstrap for __GAME_TITLE__: build the actor and transport, hand
+// off to duel-game-core's generic wiring. Bundled by esbuild (../build.js)
+// into dist/app.js, so every import resolves from node_modules at build
+// time.
+
+import { Actor, HttpAgent } from "@icp-sdk/core/agent";
+import { safeGetCanisterEnv } from "@icp-sdk/core/agent/canister-env";
+import { makeIdlFactory } from "@research-ag/duel-game-core/idl.js";
+import { start } from "@research-ag/duel-game-core/app.js";
+import { connectTransport } from "@research-ag/duel-game-core/transport.js";
+import { resolveAnonymousIdentity } from "@research-ag/duel-game-core/anon-identity.js";
+import { deriveHost } from "@research-ag/duel-game-core/ic-env.js";
+import { plugin } from "./__PLUGIN_FILE__";
+
+const env = safeGetCanisterEnv();
+const canisterId = env?.["PUBLIC_CANISTER_ID:backend"];
+if (!canisterId) {
+  document.body.innerHTML =
+    "<p style='color:#ff7b72;padding:2rem'>Could not find " +
+    "<code>PUBLIC_CANISTER_ID:backend</code> in the <code>ic_env</code> " +
+    "cookie. Serve this page from its frontend canister, with that " +
+    "canister environment variable set to the backend's id.</p>";
+  throw new Error("missing canister id");
+}
+
+const host = deriveHost();
+// The same identity must build the agent and sign the transport calls;
+// the backend checks the two match on every request.
+const session = resolveAnonymousIdentity();
+const agent = await HttpAgent.create({
+  host,
+  identity: session.identity,
+  rootKey: env.IC_ROOT_KEY,
+});
+const idlFactory = makeIdlFactory(plugin.idlTypes);
+const actor = Actor.createActor(idlFactory, { agent, canisterId });
+
+const transport = connectTransport({ actor, gameIdlTypes: plugin.idlTypes });
+
+start({ plugin, transport, session });

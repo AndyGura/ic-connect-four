@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hosty": {
+      "type": "http",
+      "url": "https://api.hosty.live/mcp"
+    }
+  }
+}
