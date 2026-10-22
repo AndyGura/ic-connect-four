@@ -25,14 +25,43 @@ frontend or bot at `https://<backend-id>.raw.icp0.io/semantics`.
 
 ## Canisters
 
-| Canister | Id                       |
-| -------- | ------------------------ |
-| backend  | _not deployed yet_       |
-| frontend | _not deployed yet_       |
+| Canister | Id                            | State                                                                 |
+| -------- | ----------------------------- | --------------------------------------------------------------------- |
+| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | Live; module `29f5b4a2…` in hosty.live's store, verified; play-tested |
+| frontend | `cj766-haaaa-aaaau-ahgeq-cai` | Asset module installed; page **not uploaded yet** (see below)         |
 
-Both are controlled by the owner's hosty.live account. The game is
-unlisted until its frontend is registered on the
+Both are controlled by the owner's hosty.live account. The page will be
+at `https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/`. The game is unlisted
+until its frontend is registered on the
 [Duel dashboard](https://n6plc-4yaaa-aaaaj-qshia-cai.icp.net/).
+
+### Finishing the frontend
+
+On 2026-10-22 the frontend canister refused to grow its memory by the
+8 MB that authorising the hosty.live builder needs: its subnet charged a
+storage reservation that kept rising past each top-up (1.08 T on the
+canister, ~1.15 T asked). The IC's storage-reservation price falls as the
+subnet's usage does, so retry later, in a hosty.live deploy session:
+
+1. `hosty_get_canister_status { canisterId: "cj766-haaaa-aaaau-ahgeq-cai", fresh: true }`
+   for the balance, then `hosty_setup_frontend_canister` on the same id
+   (it now only authorises the builder). If it is refused again for
+   cycles, stop and decide; don't top up blindly.
+2. `cd frontend && npm run build && zip -r dist.zip dist -x "*.map"`.
+3. `hosty_prepare_zip_upload { canisterId: "cj766-haaaa-aaaau-ahgeq-cai",
+   pureAssets: true, outputDir: "dist", canisterEnv: { set:
+   { "PUBLIC_CANISTER_ID:backend": "co6yk-kyaaa-aaaau-ahgea-cai" } } }`,
+   run its `curl` from `frontend/`, `hosty_wait_for_deployment`.
+4. Check the cookie, then the page:
+
+   ```bash
+   curl -sI https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/ | grep -o 'ID%3Abackend%3D[a-z0-9%D-]*cai'
+   (cd frontend && node browser-test.mjs https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/)
+   ```
+
+The backend sits on the same subnet. It passed the play-test there, but
+keep an eye on its cycles (`hosty_get_canister_status`) as its memory
+grows with use.
 
 ## Layout
 
