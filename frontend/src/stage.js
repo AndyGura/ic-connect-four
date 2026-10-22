@@ -122,17 +122,26 @@ function radialTexture(stops, size = 128) {
   return t;
 }
 
-function verticalGlowTexture() {
+// Brightest at the top, fading down the column and out at both sides.
+function columnGlowTexture() {
   const c = document.createElement("canvas");
-  c.width = 4;
+  c.width = 64;
   c.height = 128;
   const ctx = c.getContext("2d");
-  const g = ctx.createLinearGradient(0, 0, 0, 128);
-  g.addColorStop(0, "rgba(255,255,255,0.9)");
-  g.addColorStop(0.35, "rgba(255,255,255,0.35)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 4, 128);
+  const down = ctx.createLinearGradient(0, 0, 0, 128);
+  down.addColorStop(0, "rgba(255,255,255,0.9)");
+  down.addColorStop(0.35, "rgba(255,255,255,0.35)");
+  down.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = down;
+  ctx.fillRect(0, 0, 64, 128);
+  const across = ctx.createLinearGradient(0, 0, 64, 0);
+  across.addColorStop(0, "rgba(0,0,0,0)");
+  across.addColorStop(0.3, "rgba(0,0,0,1)");
+  across.addColorStop(0.7, "rgba(0,0,0,1)");
+  across.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.globalCompositeOperation = "destination-in";
+  ctx.fillStyle = across;
+  ctx.fillRect(0, 0, 64, 128);
   return new THREE.CanvasTexture(c);
 }
 
@@ -168,7 +177,8 @@ export function createStage(container, hooks = {}) {
   const key = new THREE.DirectionalLight(0xffe1c2, 2.3);
   key.position.set(-5, 9, 8);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  const small = Math.min(window.screen?.width ?? 1024, window.screen?.height ?? 1024) < 700;
+  key.shadow.mapSize.setScalar(small ? 1024 : 2048);
   Object.assign(key.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 30 });
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.02;
@@ -259,6 +269,7 @@ export function createStage(container, hooks = {}) {
     });
     glowMat[seat] = discMat[seat].clone();
     glowMat[seat].emissive = new THREE.Color(COLOR[seat]);
+    glowMat[seat].emissiveIntensity = 0.3;
     ghostMat[seat] = discMat[seat].clone();
     Object.assign(ghostMat[seat], { transparent: true, opacity: 0.45, depthWrite: false });
   }
@@ -280,9 +291,9 @@ export function createStage(container, hooks = {}) {
 
   // A soft light down the hovered column.
   const columnGlow = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.9, BOARD_TOP - BOARD_BOTTOM - 0.25),
+    new THREE.PlaneGeometry(1.1, BOARD_TOP - BOARD_BOTTOM - 0.25),
     new THREE.MeshBasicMaterial({
-      map: verticalGlowTexture(),
+      map: columnGlowTexture(),
       color: 0xfff1d6,
       transparent: true,
       opacity: 0,
@@ -306,7 +317,7 @@ export function createStage(container, hooks = {}) {
   const winBars = new THREE.Group();
   board.add(winBars);
   const barMat = new THREE.MeshBasicMaterial({
-    color: 0xfff3d1,
+    color: 0xffe2a6,
     transparent: true,
     opacity: 0,
     blending: THREE.AdditiveBlending,
@@ -518,11 +529,16 @@ export function createStage(container, hooks = {}) {
     await tween(0.45, (k) => (slider.position.x = x0 + (1 - k) * SLIDER_TRAVEL), easeInOut);
   }
 
+  function clearBars() {
+    for (const bar of winBars.children) bar.geometry.dispose();
+    winBars.clear();
+  }
+
   function clearDecorations() {
     decoKey = "";
     ring.visible = false;
     for (const s of shown) if (s) s.mesh.material = discMat[s.seat];
-    winBars.clear();
+    clearBars();
   }
 
   function decorate(want) {
@@ -539,7 +555,7 @@ export function createStage(container, hooks = {}) {
     if (key === decoKey) return;
     decoKey = key;
     for (const s of shown) if (s) s.mesh.material = discMat[s.seat];
-    winBars.clear();
+    clearBars();
     if (want.winLine.length === 0) return;
     winAge = 0;
     for (const i of want.winLine) if (shown[i]) shown[i].mesh.material = glowMat[shown[i].seat];
@@ -552,8 +568,8 @@ export function createStage(container, hooks = {}) {
       const mid = from.clone().add(to).multiplyScalar(0.5);
       const angle = Math.atan2(to.y - from.y, to.x - from.x);
       for (const [radius, mat] of [
-        [0.055, barMat],
-        [0.17, haloMat],
+        [0.06, barMat],
+        [0.2, haloMat],
       ]) {
         const bar = new THREE.Mesh(new THREE.CapsuleGeometry(radius, len, 6, 16), mat);
         bar.rotation.z = angle - Math.PI / 2;
@@ -817,8 +833,8 @@ export function createStage(container, hooks = {}) {
       const grow = easeInOut(clamp01(winAge / 0.7));
       for (const bar of winBars.children) bar.scale.y = Math.max(0.001, grow);
       const pulse = 0.5 + 0.5 * Math.sin(clock * 2.2);
-      barMat.opacity = grow * (0.55 + 0.3 * pulse);
-      haloMat.opacity = grow * (0.1 + 0.08 * pulse);
+      barMat.opacity = grow * (0.55 + 0.25 * pulse);
+      haloMat.opacity = grow * (0.16 + 0.1 * pulse);
       for (const seat of ["p1", "p2"]) glowMat[seat].emissiveIntensity = 0.12 + 0.3 * pulse;
     }
 
