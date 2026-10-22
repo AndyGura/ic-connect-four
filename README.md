@@ -38,15 +38,18 @@ until its frontend is registered on the
 ### Finishing the frontend
 
 On 2026-10-22 the frontend canister refused to grow its memory by the
-8 MB that authorising the hosty.live builder needs: its subnet charged a
-storage reservation that kept rising past each top-up (1.08 T on the
-canister, ~1.15 T asked). The IC's storage-reservation price falls as the
-subnet's usage does, so retry later, in a hosty.live deploy session:
+8 MB that authorising the hosty.live builder needs (`IC0532`, "cannot
+grow memory … due to insufficient cycles"). Topping up does not close
+the gap: every top-up raised the requirement by most of the amount added
+(0.74 T held → ~0.77 T asked, 1.08 → ~1.15, 1.18 → ~1.23). It holds
+1.18 T now. Don't add more cycles to it; retry only the authorisation
+later, in a hosty.live deploy session:
 
 1. `hosty_get_canister_status { canisterId: "cj766-haaaa-aaaau-ahgeq-cai", fresh: true }`
    for the balance, then `hosty_setup_frontend_canister` on the same id
    (it now only authorises the builder). If it is refused again for
-   cycles, stop and decide; don't top up blindly.
+   cycles, stop: the alternative is a frontend canister on another
+   subnet.
 2. `cd frontend && npm run build && zip -r dist.zip dist -x "*.map"`.
 3. `hosty_prepare_zip_upload { canisterId: "cj766-haaaa-aaaau-ahgeq-cai",
    pureAssets: true, outputDir: "dist", canisterEnv: { set:
