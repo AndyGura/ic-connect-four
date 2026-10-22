@@ -86,6 +86,23 @@ taken from the plugin's own column buttons, tries one illegal move, then
 a rematch, a leave and both debriefs. Against a deployed backend:
 `node play-test.mjs <backend-id> --ic`.
 
+`browser-test.mjs` checks the page itself in two headless Chromium tabs:
+a protected table, a game played with every input (keys, a click on the
+3D board, arrow-key aiming, the column buttons) to Red's win, both 3D
+boards settled on the real position, then a rematch and a forfeit. It
+needs Playwright (`npm i -D playwright && npx playwright install
+chromium`):
+
+```bash
+cd frontend
+node browser-test.mjs https://<frontend-id>.icp0.io/   # the live page
+node browser-test.mjs --serve <backend-id>             # dist/, served locally, against a mainnet backend
+```
+
+Without a GPU, Chromium renders the board in software at a frame or two
+a second, so the 3D board needs a few minutes to catch up; the test
+waits for it. Screenshots land in `frontend/browser-test-shots/`.
+
 ## Update the live game
 
 Every change: run the three tests above first, then upgrade the same two
