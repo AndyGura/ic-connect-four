@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v0.1.0-beta.2/docs/schemas/icp-yaml-schema.json
+
+# `backend` is the live game's own module (co6yk-kyaaa-aaaau-ahgea-cai),
+# downloaded from hosty.live's module store, so a local `icp deploy` runs
+# a private copy of the game next to the bot. `sparring` plays the bot in
+# local tests only and never goes to mainnet.
+canisters:
+  - name: backend
+    recipe:
+      type: "@dfinity/prebuilt@v2.1.0"
+      configuration:
+        path: backend.wasm
+        sha256: c9ed010f487231e4efe70fe6a568e5d863be6f2ef7f7ae8154f1867f2de7da2c
+  - name: bot
+    recipe:
+      type: "@dfinity/motoko@v4.1.0"
+      configuration:
+        main: src/Bot.mo
+  - name: sparring
+    recipe:
+      type: "@dfinity/motoko@v4.1.0"
+      configuration:
+        main: src/Sparring.mo
