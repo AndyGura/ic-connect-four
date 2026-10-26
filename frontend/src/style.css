@@ -405,6 +405,84 @@ button.c4-seat {
   font-size: 0.86rem;
 }
 
+/* ── bots ────────────────────────────────────────────────────────────── */
+
+.c4-bots h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+button.c4-bots-open {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  margin-bottom: 1.2rem;
+  padding: 0.75rem 0.8rem;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.c4-bots-icon {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.c4-add-bot {
+  margin-top: -0.25rem;
+}
+
+/* The bot dialog lives in the panel, in place of #screen while open
+ * (duel-game-core.css makes it a full-page overlay by default). */
+#bot-challenge-panel {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  overflow: visible;
+  background: none;
+  padding: 0;
+}
+
+body.bots-open #screen {
+  display: none;
+}
+
+.bot-challenge-header {
+  max-width: none;
+  margin: 0 0 1rem;
+}
+
+.bot-challenge-header button {
+  padding: 0.35rem 0.75rem;
+}
+
+.bot-challenge-header h2 {
+  margin: 0;
+}
+
+.bot-challenge-body {
+  max-width: none;
+}
+
+.bot-challenge-body .leaderboard-row {
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bot-challenge-body .leaderboard-player {
+  font-family: inherit;
+}
+
+.bot-challenge-body .leaderboard-challenge {
+  border-radius: 10px;
+}
+
 /* ── in game ─────────────────────────────────────────────────────────── */
 
 .turnbar {

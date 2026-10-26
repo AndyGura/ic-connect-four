@@ -1,6 +1,7 @@
 // Bootstrap for Connect Four: build the actor and transport, hand off to
 // duel-game-core's generic wiring for the panel (lobby, turn bar, claim
-// clock, debrief), and drive the 3D board beside it from the same client.
+// clock, debrief), drive the 3D board beside it from the same client, and
+// wire the bot dialog.
 // Bundled by esbuild (../build.js) into dist/app.js, so every import
 // resolves from node_modules at build time.
 
@@ -15,6 +16,7 @@ import { atTableOf, viewOf, viewTagOf, withLocalMove } from "@research-ag/duel-g
 import { debriefVerdict, tag } from "@research-ag/duel-game-core/render.js";
 import { decodeGame, plugin } from "./connect-four-plugin.js";
 import { screens } from "./screens.js";
+import { createBotChallenge } from "./bots.js";
 import { createStage } from "./stage.js";
 import { createSound } from "./sound.js";
 
@@ -92,6 +94,8 @@ const actor = Actor.createActor(idlFactory, { agent, canisterId });
 const transport = connectTransport({ actor, gameIdlTypes: plugin.idlTypes });
 
 client = start({ plugin, transport, session, screens });
+
+createBotChallenge({ actor, agent, backendId: canisterId, client, plugin });
 
 // What the board shows: the status as drawn (your pending drop already
 // applied), mapped onto a stage scene.

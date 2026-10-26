@@ -43,13 +43,23 @@
 
     <aside class="panel">
       <p id="error" class="error" hidden></p>
+      <!-- The bot dialog (bots.js): shown in place of #screen while open,
+           so a status redraw of #screen never clobbers it. -->
+      <section id="bot-challenge-panel" hidden>
+        <div class="bot-challenge-header">
+          <button id="bot-challenge-back" class="ghost">← Back</button>
+          <h2>Play a bot</h2>
+        </div>
+        <div id="bot-challenge-body" class="bot-challenge-body"></div>
+      </section>
       <main id="screen">
         <p class="muted">Connecting…</p>
       </main>
       <footer>
         <p class="muted">
           Your session id is per browser tab — open a second tab to play the
-          other seat. An idle game can be taken over after 150&nbsp;seconds.
+          other seat, or challenge a bot. An idle game can be taken over
+          after 150&nbsp;seconds.
         </p>
       </footer>
     </aside>

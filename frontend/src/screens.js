@@ -1,9 +1,10 @@
-// The two default screens Connect Four words in its own voice, passed to
-// `start({ screens })`. Both keep the default shell's `data-*` attributes
+// The default screens Connect Four words in its own voice, passed to
+// `start({ screens })`. All keep the default shell's `data-*` attributes
 // and form inputs, so its click handling, access-code prompt and create-
-// table form all work unchanged.
+// table form all work unchanged. `data-open-bots` opens the bot dialog
+// (bots.js).
 
-import { debriefVerdict, esc, renderTableRow, tag } from "@research-ag/duel-game-core/render.js";
+import { debriefVerdict, esc, renderStagingYou, renderTableRow, tag } from "@research-ag/duel-game-core/render.js";
 
 const chip = (seat) => `<span class="c4-chip c4-chip-${seat}" aria-hidden="true"></span>`;
 
@@ -31,6 +32,16 @@ function browsing(v, plugin) {
         ${seatBtn("p2", "drops second")}
       </div>
     </section>
+    <section class="c4-bots">
+      <h3>Play a bot</h3>
+      <button type="button" class="c4-bots-open" data-open-bots>
+        <span class="c4-bots-icon" aria-hidden="true">🤖</span>
+        <span class="c4-seat-text">
+          <span class="seat-label">Challenge a bot</span>
+          <span class="muted">a computer player registered with this game</span>
+        </span>
+      </button>
+    </section>
     <section class="open-tables">
       <h3>Tables</h3>
       ${
@@ -39,6 +50,16 @@ function browsing(v, plugin) {
           : v.tables.map((r) => renderTableRow(r, plugin)).join("")
       }
     </section>`;
+}
+
+// Waiting for an opponent: a bot may take the open seat — unless it is
+// held for the last opponent (a Rematch against a bot re-invites it by
+// itself).
+function stagingYou(v, plugin) {
+  const addBot = v.reservedForPartner
+    ? ""
+    : `<p class="c4-add-bot"><button type="button" class="ghost" data-open-bots>🤖 Add a bot to the open seat</button></p>`;
+  return renderStagingYou(v, plugin) + addBot;
 }
 
 // The final board is the 3D stage; `renderBoard` adds who was who and the
@@ -58,4 +79,4 @@ function debrief(v, plugin) {
     </p>`;
 }
 
-export const screens = { browsing, debrief };
+export const screens = { browsing, stagingYou, debrief };

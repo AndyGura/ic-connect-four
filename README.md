@@ -3,7 +3,8 @@
 Classic Connect Four for two players on the Internet Computer, built on
 [duel-game-core](https://github.com/research-ag/duel-core): a 3D board
 with slow, relaxed animations, quiet generative lounge music, and the
-framework's lobby, seating, rematch, idle takeover and claim-a-win.
+framework's lobby, seating, rematch, idle takeover and claim-a-win. Bots —
+canister players anyone can write and register — can take a seat too.
 
 ## The game
 
@@ -23,12 +24,46 @@ sit in the header and are remembered per browser.
 The backend publishes the full rules for anyone building their own
 frontend or bot at `https://<backend-id>.raw.icp0.io/semantics`.
 
+## Bots
+
+The game ships no bot of its own: it seats any canister that registers
+with it, through duel-game-core's canister players.
+
+**Playing one.** "Challenge a bot" in the lobby lists every registered
+bot, once per level it plays; pick one and your colour, and a table opens
+for the two of you. While waiting at a table of your own, "Add a bot to
+the open seat" fills it instead (an access-code table included). A
+Rematch re-invites the same bot at the same level by itself.
+
+**Writing one.** A bot is a canister of its own that the backend calls
+whenever the bot is due to drop:
+
+- `make_move : (MoveRequest<View, Action>) -> async Action` — the reply
+  is the drop. The request carries the bot's own `View` (the whole board;
+  nothing is hidden), its seat, the level it was invited at and the
+  opponent's last drop. An illegal reply is asked once more with the
+  rules' reason; silence or a trap leaves the usual timeouts to act.
+- `play(backend, tableId, seat, code, level)`, public — what the page
+  calls to invite it; it forwards to the backend's
+  `join_table_as_canister(tableId, seat, code, level)`.
+- Once, from the bot canister, `register_bot(name, levels)` on the
+  backend lists it (`unregister_bot()` removes it). `levels` is the bot's
+  own list, e.g. `["Easy", "Hard"]`; `[]` lists it once as "Default".
+
+`View` and `Action` are in `/semantics` and the backend's Candid.
+duel-game-core's skill walks through a bot for an already-deployed game
+(`.claude/skills/duel-game-core/references/bot-for-existing-game.md`,
+then `canister-player-bots.md`). Each bot level can sit at three tables
+at once (the framework's per-player limit); a fourth invitation is
+refused with "already playing 3 games". There is no leaderboard, so the
+list shows no ratings.
+
 ## Canisters
 
-| Canister | Id                            |                                                    |
-| -------- | ----------------------------- | -------------------------------------------------- |
-| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | module `29f5b4a2…`, in hosty.live's store, verified |
-| frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/        |
+| Canister | Id                            |                                                                            |
+| -------- | ----------------------------- | -------------------------------------------------------------------------- |
+| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | module `29f5b4a2…`, in hosty.live's store, verified — predates bot support |
+| frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/                               |
 
 Both are controlled by the owner's hosty.live account. The game is
 unlisted until its frontend is registered on the
@@ -45,19 +80,22 @@ which would wipe its tables. Check both with `hosty_get_canister_status`.
 
 ## Layout
 
-| Path                                 | What it is                                                                                   |
-| ------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `src/ConnectFourRules.mo`            | The rules: a pure `#turnBased` module (`State`, `Action`, `View`, `SEMANTICS`).              |
-| `src/Host.mo`                        | The host actor, from the framework's template (idle timeout 150 s, claim timeout 120 s).     |
-| `test/RulesUnit.test.mo`             | Unit checks of every rule, win direction, draw and rejection.                                |
-| `test/Lifecycle.test.mo`             | Whole games through the real engine: a win, a rematch, a 42-disc draw, the engine's gates.   |
-| `frontend/src/connect-four-plugin.js`| The `GamePlugin`: Candid types, the panel's player strip, column buttons, `applyLocal`.      |
-| `frontend/src/stage.js`              | The Three.js board beside the panel: disc physics, hover, last-move ring, win glow.          |
-| `frontend/src/sound.js`              | Web Audio lounge loop and sound effects; no audio files.                                     |
-| `frontend/src/screens.js`            | The lobby and debrief screens in the game's own words.                                       |
-| `frontend/src/app.js`                | Bootstrap: agent, transport, the default shell, and the wiring to the stage and the sound.   |
-| `frontend/play-test.mjs`             | Headless end-to-end test: two fresh players play whole games through the real client.        |
-| `.claude/skills/duel-game-core/`     | The framework's skill, which Claude Code sessions on this repository load by themselves.     |
+| Path                                  | What it is                                                                                                      |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/ConnectFourRules.mo`             | The rules: a pure `#turnBased` module (`State`, `Action`, `View`, `SEMANTICS`).                                 |
+| `src/Host.mo`                         | The host actor, from the framework's template (idle timeout 150 s, claim timeout 120 s), with canister players. |
+| `src/BotIface.mo`                     | The call that asks a seated bot canister for its drop (`make_move`).                                            |
+| `test/RulesUnit.test.mo`              | Unit checks of every rule, win direction, draw and rejection.                                                   |
+| `test/Lifecycle.test.mo`              | Whole games through the real engine: a win, a rematch, a 42-disc draw, the engine's gates.                      |
+| `test/CanisterPlayers.test.mo`        | A bot seat through the real engine: asked per drop, an illegal reply retried, a rematch, leaving.               |
+| `frontend/src/connect-four-plugin.js` | The `GamePlugin`: Candid types, the panel's player strip, column buttons, `applyLocal`.                         |
+| `frontend/src/stage.js`               | The Three.js board beside the panel: disc physics, hover, last-move ring, win glow.                             |
+| `frontend/src/sound.js`               | Web Audio lounge loop and sound effects; no audio files.                                                        |
+| `frontend/src/screens.js`             | The lobby, waiting and debrief screens in the game's own words.                                                 |
+| `frontend/src/bots.js`                | The bot dialog: the bot list, the seat choice, the bot's `play`, a rematch re-inviting it.                      |
+| `frontend/src/app.js`                 | Bootstrap: agent, transport, the default shell, and the wiring to the stage, the sound and the bots.            |
+| `frontend/play-test.mjs`              | Headless end-to-end test: two fresh players play whole games through the real client.                           |
+| `.claude/skills/duel-game-core/`      | The framework's skill, which Claude Code sessions on this repository load by themselves.                        |
 
 ## Build
 
@@ -84,7 +122,7 @@ icp build backend                    # .icp/cache/artifacts/backend
 ## Test
 
 ```bash
-mops test                            # rules unit checks + engine lifecycle
+mops test                            # rules unit checks, engine lifecycle, bot seats
 icp network start -d                 # a local Internet Computer
 icp deploy                           # both canisters, locally; prints the page's URL
 (cd frontend && node play-test.mjs)  # whole games, a rematch and a leave, via the real client
@@ -121,7 +159,10 @@ hosty.live web app. Each install is approved once in a hosty.live deploy
 session.
 
 Backend — upgrade in place, keeping its tables, with a snapshot to roll
-back to:
+back to. Bot support only adds stable fields (the bot directory), so the
+upgrade from the live module keeps every table; check any later change
+with `moc --stable-compatible` against the live module's
+`motoko:stable-types` before installing:
 
 ```bash
 icp build backend
