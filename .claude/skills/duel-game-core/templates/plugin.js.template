@@ -1,0 +1,104 @@
+// GamePlugin for __GAME_TITLE__ — the only game-specific client code.
+// Action/View/Options must mirror ../src/__RULES_MODULE__.mo exactly.
+// `legal()` is a cosmetic echo of that module's `validate`, `applyLocal`
+// of its `resolve`.
+
+import { actionAttr, esc } from "@research-ag/duel-game-core/render.js";
+
+const SEAT_NAME = { p1: "__P1_NAME__", p2: "__P2_NAME__" };
+
+// One entry per Action variant; `key` is the variant name.
+const ACTIONS = [
+  // { key: "yourMove", label: "YOUR MOVE", hint: "what it does" },
+];
+
+function legal(mySide, actionKey) {
+  return true;
+}
+
+export const plugin = {
+  idlTypes({ IDL }) {
+    // Candid shape, not JS naming. Nat/Int decode to bigint; a tuple to
+    // an array.
+    const Side = IDL.Record({
+      // ...your Side fields...
+    });
+    const Action = IDL.Variant({
+      // yourMove: IDL.Null,
+    });
+    const Round = IDL.Record({
+      p1Action: Action,
+      p2Action: Action,
+    });
+    // What a seat sees (the rules module's `View`).
+    const View = IDL.Record({
+      p1: Side,
+      p2: Side,
+      lastRound: IDL.Opt(Round),
+      // variant: IDL.Variant({ classic: IDL.Null, yourOtherVariant: IDL.Null }),
+    });
+    // A table's options; the empty record for a game without any.
+    const Options = IDL.Record({});
+    // const Options = IDL.Record({
+    //   variant: IDL.Variant({ classic: IDL.Null, yourOtherVariant: IDL.Null }),
+    //   roundsToWin: IDL.Nat,
+    // });
+    return { Action, View, Options };
+  },
+
+  seatLabel(seat) {
+    return SEAT_NAME[seat];
+  },
+
+  // Called for a live game and for a debrief's final state. Must show
+  // the opponent's last move in both; here, `lastRound`'s two picks.
+  renderBoard(gameState, mySeat, oppSeat) {
+    return `<pre>${esc(JSON.stringify(gameState, (_, v) =>
+      typeof v === "bigint" ? v.toString() : v, 2))}</pre>`;
+  },
+
+  // Only called while it's legal for mySeat to move.
+  renderActions(gameState, mySeat) {
+    const me = gameState[mySeat];
+    return ACTIONS.map((a) => {
+      const enabled = legal(me, a.key);
+      return `
+        <button ${actionAttr({ [a.key]: null })} ${enabled ? "" : "disabled"}>
+          <span class="act">${a.label}</span>
+          <span class="hint">${esc(a.hint)}</span>
+        </button>`;
+    }).join("");
+  },
+
+  // The state as it will look once mySeat's move lands, drawn while the
+  // submit is in flight. A hidden simultaneous pick changes nothing
+  // visible, so the state comes back as-is (the screen still flips to
+  // "locked in" at once); a board game places the piece here.
+  applyLocal(gameState, mySeat, move) {
+    return gameState;
+  },
+
+  // Optional — only for a leaderboard storing a converted score (an ELO
+  // game keeps the default plain integer):
+  //
+  // formatScore(score) {
+  //   const ms = 3_600_000n - score;
+  //   ...format ms as a time string...
+  // },
+
+  // Optional pair — only for a game with table options. First entry is
+  // the default; `options` is the typed value `duel_create_table`
+  // receives (Nat fields as bigint), `key` only names the radio button.
+  // `formatOptions` labels a table's stored options in the lobby.
+  //
+  // optionChoices() {
+  //   return [
+  //     { key: "classic", label: "Classic", options: { variant: { classic: null }, roundsToWin: 3n } },
+  //     { key: "other", label: "Your Other Variant", options: { variant: { yourOtherVariant: null }, roundsToWin: 3n } },
+  //   ];
+  // },
+  // formatOptions(options) {
+  //   const variant = Object.keys(options.variant)[0];
+  //   return `${{ classic: "Classic", yourOtherVariant: "Your Other Variant" }[variant]} · first to ${options.roundsToWin}`;
+  // },
+};

@@ -1,0 +1,7 @@
+.mops
+.icp/cache
+frontend/node_modules
+frontend/dist
+frontend/dist.zip
+*.wasm
+.DS_Store
