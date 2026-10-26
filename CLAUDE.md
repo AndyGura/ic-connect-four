@@ -13,15 +13,16 @@ for a change to the live game, its `references/changing-a-live-game.md`.
 | backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | the game; the module store has it            |
 | frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/ |
 
-Deployed through hosty.live (`going-live.md`). The live backend module
-predates bot support; this tree adds it, and the upgrade has not been
-deployed yet.
+Deployed through hosty.live (`going-live.md`). The live backend runs
+this tree's bot support since 2026-10-26 (module c9ed010f…, snapshot
+taken before the upgrade). The live page has not been re-uploaded with
+the bot dialog yet.
 
 ## What the game runs
 
 - Mode: `#turnBased`.
-- Bot support (the Host's and the page's BOTS lines): on in this tree,
-  not yet on the live backend. The page's bot dialog is the game's own
+- Bot support (the Host's and the page's BOTS lines): on in this tree
+  and on the live backend; the live page predates the bot dialog. The page's bot dialog is the game's own
   `frontend/src/bots.js`.
 - Leaderboard: off.
 - A bot canister: none yet; any bot that calls `register_bot` is listed.
