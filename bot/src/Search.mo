@@ -1,24 +1,38 @@
-import Int "mo:core/Int";
+import Int64 "mo:core/Int64";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
 import VarArray "mo:core/VarArray";
 
-/// A Connect Four searcher over bitboards: negamax with alpha-beta, a
-/// transposition table and iterative deepening, with a heuristic score
-/// at the depth limit. No actor, no `Time`, no storage: the caller passes
-/// its budget (`maxNodes`, and `outOfTime` for an instruction limit).
+import Book "Book";
+
+/// A Connect Four searcher over bitboards. Two searches share one budget:
+///
+/// - an exact one (`solveFrom` discs on): win, draw or loss with perfect
+///   play from both sides, no depth limit, its own share of the budget;
+/// - a heuristic one: negamax with alpha-beta (principal variation
+///   search), a transposition table and iterative deepening, scoring the
+///   horizon with `score`. It decides when the exact search ran out of
+///   budget, and picks among the moves the exact search found equal.
+///
+/// No actor, no `Time`, no storage: the caller passes its budget, in
+/// nodes (`maxNodes`) and in its own work units (`maxWork` against
+/// `clock`; instructions in the canister).
 ///
 /// Bit `col * 7 + row` is cell (col, row), row 0 at the bottom. Each
 /// column has a seventh, always empty bit on top, so shifts never carry a
 /// line from one column into the next. A position is `cur` (the discs of
-/// the seat on turn) and `mask` (every disc).
+/// the seat on turn), `mask` (every disc) and `moves` (how many).
+///
+/// The hot paths use fixed-width numbers only: in Motoko an `Int`
+/// subtraction costs about seventy times an `Int64` one.
 module {
 
-  public let WIN : Int = 100_000;
-  let INF : Int = 1_000_000;
+  /// A win with the k-th disc of the game scores `WIN - k` for the winner.
+  public let WIN : Int64 = 100_000;
+  let INF : Int64 = 1_000_000;
 
   /// Above this, a score is a proven win (below its negation, a loss).
-  public let PROVEN : Int = 99_900;
+  public let PROVEN : Int64 = 99_900;
 
   let BOTTOM : Nat64 = 0x40810204081; // row 0 of every column
   let BOARD : Nat64 = 0xfdfbf7efdfbf; // every playable cell
@@ -37,18 +51,19 @@ module {
 
   /// Centre first: the usual best-first guess before any search.
   public let ORDER : [Nat] = [3, 2, 4, 1, 5, 0, 6];
+  let COLUMN : [Nat64] = [0x3f, 0x1f80, 0xfc000, 0x7e00000, 0x3f0000000, 0x1f800000000, 0xfc0000000000];
 
   // Heuristic weights, in cell-weight units.
-  let THREAT : Int = 12; // an empty cell that would complete four
-  let PARITY : Int = 14; // ...on a row that favours its owner (Allis' rule)
-  let STACKED : Int = 24; // ...with another threat of the same seat right above
+  let THREAT : Nat64 = 12; // an empty cell that would complete four
+  let PARITY : Nat64 = 14; // ...on a row that favours its owner (Allis' rule)
+  let STACKED : Nat64 = 24; // ...with another threat of the same seat right above
 
-  public func columnMask(col : Nat) : Nat64 = 0x3f << Nat.toNat64(col * 7);
+  public func columnMask(col : Nat) : Nat64 = COLUMN[col];
 
   /// The cells a disc can be dropped into now, one per open column.
   public func possible(mask : Nat64) : Nat64 = (mask + BOTTOM) & BOARD;
 
-  public func popcount(x : Nat64) : Nat = Nat64.toNat(Nat64.bitcountNonZero(x));
+  public func popcount(x : Nat64) : Nat = Nat64.bitcountNonZero(x).toNat();
 
   /// The empty cells that would complete four or more for `pos`.
   public func winningCells(pos : Nat64, mask : Nat64) : Nat64 {
@@ -90,75 +105,120 @@ module {
     m & (m >> 2) != 0;
   };
 
-  func weighted(x : Nat64) : Int {
-    popcount(x & W1) + 2 * popcount(x & W2) + 4 * popcount(x & W4) + 8 * popcount(x & W8);
+  func weighted(x : Nat64) : Nat64 {
+    Nat64.bitcountNonZero(x & W1) + (Nat64.bitcountNonZero(x & W2) << 1) + (Nat64.bitcountNonZero(x & W4) << 2) + (Nat64.bitcountNonZero(x & W8) << 3);
   };
 
-  func threatScore(threats : Nat64, good : Nat64) : Int {
-    THREAT * popcount(threats) + PARITY * popcount(threats & good) + STACKED * popcount(threats & (threats >> 1));
+  func threatScore(threats : Nat64, good : Nat64) : Nat64 {
+    THREAT * Nat64.bitcountNonZero(threats) + PARITY * Nat64.bitcountNonZero(threats & good) + STACKED * Nat64.bitcountNonZero(threats & (threats >> 1));
   };
 
-  /// The heuristic score of a position for the seat on turn.
-  public func evaluate(cur : Nat64, mask : Nat64, moves : Nat) : Int {
-    let opp = cur ^ mask;
+  /// The heuristic score of a position for the seat on turn, given both
+  /// seats' winning cells.
+  public func score(cur : Nat64, mask : Nat64, moves : Nat64, curWin : Nat64, oppWin : Nat64) : Int64 {
     // The seat on turn is Red when an even number of discs is down.
-    let (curGood, oppGood) = if (moves % 2 == 0) (ROWS_024, ROWS_135) else (ROWS_135, ROWS_024);
-    weighted(cur) - weighted(opp) + threatScore(winningCells(cur, mask), curGood) - threatScore(winningCells(opp, mask), oppGood);
+    let curGood = if (moves & 1 == 0) ROWS_024 else ROWS_135;
+    let mine = weighted(cur) + threatScore(curWin, curGood);
+    let theirs = weighted(cur ^ mask) + threatScore(oppWin, BOARD ^ curGood);
+    Int64.fromNat64(mine) - Int64.fromNat64(theirs);
+  };
+
+  let ZUGZWANG : Nat64 = 48; // the only seat with a threat on its own rows
+
+  /// `score`, with Allis' threat rules on top: a threat right above an
+  /// opponent's threat is dead (the cell below decides first), and the
+  /// one seat holding live threats on its own rows controls the zugzwang
+  /// at the end of the game.
+  public func scoreRules(cur : Nat64, mask : Nat64, moves : Nat64, curWin : Nat64, oppWin : Nat64) : Int64 {
+    let curGood = if (moves & 1 == 0) ROWS_024 else ROWS_135;
+    let oppGood = BOARD ^ curGood;
+    let curLive = curWin & ^(oppWin << 1);
+    let oppLive = oppWin & ^(curWin << 1);
+    var mine = weighted(cur) + threatScore(curLive, curGood);
+    var theirs = weighted(cur ^ mask) + threatScore(oppLive, oppGood);
+    let curZ = curLive & curGood;
+    let oppZ = oppLive & oppGood;
+    if (curZ != 0 and oppZ == 0) mine += ZUGZWANG else if (oppZ != 0 and curZ == 0) theirs += ZUGZWANG;
+    Int64.fromNat64(mine) - Int64.fromNat64(theirs);
+  };
+
+  public func evaluate(cur : Nat64, mask : Nat64, moves : Nat64) : Int64 {
+    score(cur, mask, moves, winningCells(cur, mask), winningCells(cur ^ mask, mask));
   };
 
   public type Settings = {
     /// Plies searched below the root move; iterative deepening stops there.
     maxDepth : Nat;
     /// Root moves scoring within `margin` of the best are picked at random.
-    margin : Int;
+    margin : Int64;
     /// Searches one ply on when the depth limit is hit with a forced block.
     extendForced : Bool;
+    /// The budget: nodes, and work units on `clock` (0: none).
     maxNodes : Nat;
+    maxWork : Nat;
+    /// With at least this many discs down, the exact search goes first
+    /// (43: never), within `solveShare` percent of the budget.
+    solveFrom : Nat;
+    solveShare : Nat;
     ttSize : Nat;
+    /// Scores the horizon with `scoreRules` rather than `score`.
+    rules : Bool;
+    /// Plays the opening book's move wherever it has one.
+    book : Bool;
   };
 
   public type Result = {
     col : Nat;
-    score : Int;
-    /// The deepest iteration that completed (0: decided without search).
+    score : Int64;
+    /// The deepest heuristic iteration that completed (0: none was needed).
     depth : Nat;
     nodes : Nat;
+    /// The exact value for the mover (1 win, 0 draw, -1 loss), when solved.
+    exact : ?Int;
   };
 
   // Transposition-table entry flags.
-  let EXACT = 0;
-  let LOWER = 1;
-  let UPPER = 2;
+  let EXACT : Nat64 = 0;
+  let LOWER : Nat64 = 1;
+  let UPPER : Nat64 = 2;
 
-  public class Searcher(settings : Settings, outOfTime : () -> Bool) {
+  public class Searcher(settings : Settings, clock : () -> Nat) {
 
     let size = Nat.max(settings.ttSize, 1);
-    let size64 = Nat.toNat64(size);
+    let size64 = size.toNat64();
+    // The heuristic search's table, and the exact search's.
     let ttKey = VarArray.repeat<Nat64>(0, size);
-    let ttScore = VarArray.repeat<Int>(0, size);
-    let ttMeta = VarArray.repeat<Nat>(0, size); // depth * 32 + flag * 8 + col
-    // Per-ply move lists, so a node allocates nothing.
+    let ttScore = VarArray.repeat<Int64>(0, size);
+    let ttMeta = VarArray.repeat<Nat64>(0, size); // depth << 5 | flag << 3 | col
+    let exKey = VarArray.repeat<Nat64>(0, size);
+    let exBounds = VarArray.repeat<Nat64>(0, size); // (lo + 1) * 3 + (hi + 1)
+    // Per-position move lists, indexed by discs down, so a node allocates
+    // nothing.
     let bufCol = VarArray.tabulate<[var Nat]>(43, func _ = VarArray.repeat<Nat>(0, 7));
-    let bufKey = VarArray.tabulate<[var Int]>(43, func _ = VarArray.repeat<Int>(0, 7));
+    let bufKey = VarArray.tabulate<[var Nat64]>(43, func _ = VarArray.repeat<Nat64>(0, 7));
+    let extend = settings.extendForced;
+    let rules = settings.rules;
 
-    public var nodes = 0;
+    var nodes : Nat64 = 0;
     var aborted = false;
+    var capNodes = settings.maxNodes.toNat64();
+    var capWork = settings.maxWork;
 
     func checkBudget() {
-      if (nodes >= settings.maxNodes or (nodes % 256 == 0 and outOfTime())) aborted := true;
+      if (nodes >= capNodes or (capWork > 0 and nodes & 255 == 0 and clock() >= capWork)) aborted := true;
     };
 
     /// Orders the columns of `next` (at most 7) best-first into
-    /// `bufCol[ply]`; answers how many there are.
-    func orderMoves(cur : Nat64, mask : Nat64, next : Nat64, ttCol : Nat, depth : Nat, ply : Nat) : Nat {
-      let cols = bufCol[ply];
-      let keys = bufKey[ply];
+    /// `bufCol[moves]`; answers how many there are. With `threats`, a move
+    /// that makes more winning cells goes first; centre first otherwise.
+    func orderMoves(cur : Nat64, mask : Nat64, moves : Nat, next : Nat64, ttCol : Nat, threats : Bool) : Nat {
+      let cols = bufCol[moves];
+      let keys = bufKey[moves];
       var n = 0;
       for (col in ORDER.values()) {
-        let mv = next & columnMask(col);
+        let mv = next & COLUMN[col];
         if (mv != 0) {
-          // Near the leaves the centre-first order is cheaper than counting threats.
-          var key : Int = if (depth >= 3) popcount(winningCells(cur | mv, mask)) else 0;
+          var key : Nat64 = if (threats) Nat64.bitcountNonZero(winningCells(cur | mv, mask)) else 0;
           if (col == ttCol) key += 100;
           // Insertion sort, stable: ties keep the centre-first order.
           var i = n;
@@ -175,48 +235,50 @@ module {
       n;
     };
 
-    /// Negamax over the position (`cur` on turn), `ply` moves below the
-    /// root. Scores are for `cur`: `WIN - k` for a win on the k-th move
-    /// from the root, its negation for a loss, `evaluate` at the horizon.
-    func negamax(cur : Nat64, mask : Nat64, moves : Nat, depthIn : Nat, alphaIn : Int, betaIn : Int, ply : Nat) : Int {
+    /// Heuristic negamax over the position (`cur` on turn), `moves` discs
+    /// down. Scores are for `cur`: `WIN - k` for a win with the game's
+    /// k-th disc, its negation for a loss, `score` at the horizon.
+    func negamax(cur : Nat64, mask : Nat64, moves : Nat, depthIn : Nat, alphaIn : Int64, betaIn : Int64) : Int64 {
       nodes += 1;
       checkBudget();
       if (aborted) return 0;
 
-      let opp = cur ^ mask;
+      let m64 = moves.toNat64();
       let poss = possible(mask);
-      if (winningCells(cur, mask) & poss != 0) return WIN - (ply + 1);
+      let curWin = winningCells(cur, mask);
+      if (curWin & poss != 0) return WIN - Int64.fromNat64(m64 + 1);
 
+      let opp = cur ^ mask;
       let oppWin = winningCells(opp, mask);
       var next = poss;
       let forced = poss & oppWin;
       if (forced != 0) {
         // Two open threats: only one can be blocked.
-        if (forced & (forced -% 1) != 0) return -(WIN - (ply + 2));
+        if (forced & (forced -% 1) != 0) return Int64.fromNat64(m64 + 2) - WIN;
         next := forced;
       };
       // Never drop right under a cell the opponent would win on.
       next &= ^(oppWin >> 1);
-      if (next == 0) return -(WIN - (ply + 2));
+      if (next == 0) return Int64.fromNat64(m64 + 2) - WIN;
       // Two cells left, no win now and a safe move: nobody can win.
-      if (moves + 2 >= 42) return 0;
+      if (m64 >= 40) return 0;
 
       var depth = depthIn;
       if (depth == 0) {
-        if (settings.extendForced and forced != 0) depth := 1 else return evaluate(cur, mask, moves);
+        if (extend and forced != 0) depth := 1 else if (rules) return scoreRules(cur, mask, m64, curWin, oppWin) else return score(cur, mask, m64, curWin, oppWin);
       };
 
       var alpha = alphaIn;
       var beta = betaIn;
       let key = cur + mask;
-      let slot = Nat64.toNat(key % size64);
+      let slot = (key % size64).toNat();
       var ttCol = 7;
       if (ttKey[slot] == key) {
         let meta = ttMeta[slot];
-        ttCol := meta % 8;
-        if (meta / 32 >= depth) {
+        ttCol := (meta & 7).toNat();
+        if (meta >> 5 >= depth.toNat64()) {
           let s = ttScore[slot];
-          let flag = (meta / 8) % 4;
+          let flag = (meta >> 3) & 3;
           if (flag == EXACT) return s;
           if (flag == LOWER and s > alpha) alpha := s;
           if (flag == UPPER and s < beta) beta := s;
@@ -225,15 +287,22 @@ module {
       };
       let alphaOrig = alpha;
 
-      let n = orderMoves(cur, mask, next, ttCol, depth, ply);
-      let cols = bufCol[ply];
+      let n = orderMoves(cur, mask, moves, next, ttCol, depth >= 3);
+      let cols = bufCol[moves];
       var best = -INF;
       var bestCol = 7;
       var i = 0;
       label children while (i < n) {
         let col = cols[i];
-        let mv = next & columnMask(col);
-        let s = -negamax(opp, mask | mv, moves + 1, depth - 1, -beta, -alpha, ply + 1);
+        let child = mask | (next & COLUMN[col]);
+        var s : Int64 = 0;
+        if (i == 0) {
+          s := -negamax(opp, child, moves + 1, depth - 1, -beta, -alpha);
+        } else {
+          // A null window first: is this move any better than the best?
+          s := -negamax(opp, child, moves + 1, depth - 1, -alpha - 1, -alpha);
+          if (not aborted and s > alpha and s < beta) s := -negamax(opp, child, moves + 1, depth - 1, -beta, -alpha);
+        };
         if (aborted) return 0;
         if (s > best) {
           best := s;
@@ -247,8 +316,74 @@ module {
       let flag = if (best <= alphaOrig) UPPER else if (best >= beta) LOWER else EXACT;
       ttKey[slot] := key;
       ttScore[slot] := best;
-      ttMeta[slot] := depth * 32 + flag * 8 + bestCol;
+      ttMeta[slot] := (depth.toNat64() << 5) | (flag << 3) | bestCol.toNat64();
       best;
+    };
+
+    /// Exact negamax: 1 win, 0 draw, -1 loss for `cur`, fail-soft
+    /// within (`alphaIn`, `betaIn`).
+    func exact(cur : Nat64, mask : Nat64, moves : Nat, alphaIn : Int64, betaIn : Int64) : Int64 {
+      nodes += 1;
+      checkBudget();
+      if (aborted) return 0;
+
+      let poss = possible(mask);
+      if (winningCells(cur, mask) & poss != 0) return 1;
+      let opp = cur ^ mask;
+      let oppWin = winningCells(opp, mask);
+      var next = poss;
+      let forced = poss & oppWin;
+      if (forced != 0) {
+        if (forced & (forced -% 1) != 0) return -1;
+        next := forced;
+      };
+      next &= ^(oppWin >> 1);
+      if (next == 0) return -1;
+      if (moves >= 40) return 0;
+
+      var alpha = alphaIn;
+      var beta = betaIn;
+      let key = cur + mask;
+      let slot = (key % size64).toNat();
+      var lo : Int64 = -1;
+      var hi : Int64 = 1;
+      if (exKey[slot] == key) {
+        let b = exBounds[slot];
+        lo := Int64.fromNat64(b / 3) - 1;
+        hi := Int64.fromNat64(b % 3) - 1;
+        if (lo >= beta) return lo;
+        if (hi <= alpha) return hi;
+        if (lo > alpha) alpha := lo;
+        if (hi < beta) beta := hi;
+      };
+      let a0 = alpha;
+
+      let n = orderMoves(cur, mask, moves, next, 7, true);
+      let cols = bufCol[moves];
+      var best : Int64 = -1;
+      var i = 0;
+      label children while (i < n) {
+        let v = -exact(opp, mask | (next & COLUMN[cols[i]]), moves + 1, -beta, -alpha);
+        if (aborted) return 0;
+        if (v > best) best := v;
+        if (v > alpha) alpha := v;
+        if (alpha >= beta) break children;
+        i += 1;
+      };
+
+      if (best >= beta) { if (best > lo) lo := best } else if (best <= a0) {
+        if (best < hi) hi := best;
+      } else {
+        lo := best;
+        hi := best;
+      };
+      exKey[slot] := key;
+      exBounds[slot] := Int64.toNat64(lo + 1) * 3 + Int64.toNat64(hi + 1);
+      best;
+    };
+
+    func result(col : Nat, score : Int64, depth : Nat, exact : ?Int) : Result {
+      { col; score; depth; nodes = nodes.toNat(); exact };
     };
 
     /// The move for the seat on turn (`cur`), `moves` discs down. `seed`
@@ -257,7 +392,13 @@ module {
       let poss = possible(mask);
       let opp = cur ^ mask;
       let win = winningCells(cur, mask) & poss;
-      if (win != 0) return { col = lowestCol(win); score = WIN - 1; depth = 0; nodes };
+      if (win != 0) return result(lowestCol(win), WIN - Int64.fromNat64(moves.toNat64() + 1), 0, ?1);
+      if (settings.book) {
+        switch (Book.lookup(cur, mask)) {
+          case (?(col, wins)) if (poss & COLUMN[col] != 0) return result(col, if wins PROVEN else 0, 0, ?(if wins 1 else 0));
+          case _ {};
+        };
+      };
 
       // The root's candidates: a forced block if there is one, and never
       // a drop under an opponent's winning cell while another move exists.
@@ -269,29 +410,60 @@ module {
       if (safe != 0) cand := safe;
 
       let roots = VarArray.repeat<Nat>(7, 7);
-      var n = 0;
-      for (col in ORDER.values()) {
-        if (cand & columnMask(col) != 0) {
-          roots[n] := col;
-          n += 1;
+      var n = orderMoves(cur, mask, moves, cand, 7, true);
+      for (i in Nat.range(0, n)) roots[i] := bufCol[moves][i];
+      if (n == 0) return result(0, 0, 0, null);
+      if (n == 1) return result(roots[0], 0, 0, null);
+
+      // The exact search, within its share of the budget: a winning move
+      // ends the search; otherwise the drawing moves, if any, are what the
+      // heuristic search may choose from.
+      var solved : ?Int = null;
+      if (moves >= settings.solveFrom) {
+        capNodes := (settings.maxNodes * settings.solveShare / 100).toNat64();
+        capWork := settings.maxWork * settings.solveShare / 100;
+        label wins for (i in Nat.range(0, n)) {
+          let col = roots[i];
+          let v = -exact(opp, mask | (cand & COLUMN[col]), moves + 1, -1, 0);
+          if (aborted) break wins;
+          if (v >= 1) return result(col, PROVEN, 0, ?1);
         };
+        if (not aborted) {
+          var draws = 0;
+          label draws_ for (i in Nat.range(0, n)) {
+            let col = roots[i];
+            let v = -exact(opp, mask | (cand & COLUMN[col]), moves + 1, 0, 1);
+            if (aborted) break draws_;
+            if (v >= 0) {
+              roots[draws] := col;
+              draws += 1;
+            };
+          };
+          if (draws > 0) {
+            // Drawing moves only (all of them, unless the budget ran out).
+            n := draws;
+            solved := ?0;
+          } else if (not aborted) solved := ?(-1);
+        };
+        aborted := false;
+        capNodes := settings.maxNodes.toNat64();
+        capWork := settings.maxWork;
+        if (n == 1) return result(roots[0], 0, 0, solved);
       };
-      if (n == 0) return { col = 0; score = 0; depth = 0; nodes };
-      if (n == 1) return { col = roots[0]; score = 0; depth = 0; nodes };
 
       // Scores of the last completed iteration, in `roots` order.
-      var done : ?[var Int] = null;
+      var done : ?[var Int64] = null;
       var doneDepth = 0;
       let maxDepth = Nat.min(settings.maxDepth, 42 - moves);
       var d = 1;
       label deepen while (d <= maxDepth) {
-        let scores = VarArray.repeat<Int>(-INF, n);
+        let scores = VarArray.repeat<Int64>(-INF, n);
         var bestScore = -INF;
         var alpha = -INF;
         var completed = 0;
         label roots_ while (completed < n) {
           let col = roots[completed];
-          let s = -negamax(opp, mask | (cand & columnMask(col)), moves + 1, d - 1, -INF, -alpha, 1);
+          let s = -negamax(opp, mask | (cand & COLUMN[col]), moves + 1, d - 1, -INF, -alpha);
           if (aborted) break roots_;
           scores[completed] := s;
           if (s > bestScore) {
@@ -318,7 +490,7 @@ module {
         d += 1;
       };
 
-      let ?scores = done else return { col = roots[0]; score = 0; depth = 0; nodes };
+      let ?scores = done else return result(roots[0], 0, 0, solved);
       var top = -INF;
       for (i in Nat.range(0, n)) { if (scores[i] > top) top := scores[i] };
       // Moves within the margin; a proven win is only ever traded for one
@@ -326,24 +498,24 @@ module {
       let floor = if (top >= PROVEN) top else top - settings.margin;
       var count = 0;
       for (i in Nat.range(0, n)) { if (scores[i] >= floor) count += 1 };
-      var pick = Nat64.toNat(seed % Nat.toNat64(Nat.max(count, 1)));
+      var pick = (seed % Nat.max(count, 1).toNat64()).toNat();
       for (i in Nat.range(0, n)) {
         if (scores[i] >= floor) {
-          if (pick == 0) return { col = roots[i]; score = scores[i]; depth = doneDepth; nodes };
+          if (pick == 0) return result(roots[i], scores[i], doneDepth, solved);
           pick -= 1;
         };
       };
-      { col = roots[0]; score = top; depth = doneDepth; nodes };
+      result(roots[0], top, doneDepth, solved);
     };
 
   };
 
   func lowestCol(cells : Nat64) : Nat {
-    Nat64.toNat(Nat64.bitcountTrailingZero(cells)) / 7;
+    Nat64.bitcountTrailingZero(cells).toNat() / 7;
   };
 
   // Stable insertion sort of `roots[0..n)` by `scores`, best first.
-  func sortRoots(roots : [var Nat], scores : [var Int], n : Nat) {
+  func sortRoots(roots : [var Nat], scores : [var Int64], n : Nat) {
     var i = 1;
     while (i < n) {
       let c = roots[i];
@@ -369,7 +541,7 @@ module {
       for (col in Nat.range(0, 7)) {
         switch (isMine(row * 7 + col)) {
           case (?mine) {
-            let bit : Nat64 = 1 << Nat.toNat64(col * 7 + row);
+            let bit : Nat64 = 1 << (col * 7 + row).toNat64();
             mask |= bit;
             if (mine) cur |= bit;
             moves += 1;

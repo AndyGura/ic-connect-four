@@ -31,7 +31,7 @@ import Search "../src/Search";
 
 let rng = Rng.new(11);
 let spec = Rules.spec;
-let never = func() : Bool = false;
+let never = func() : Nat = 0;
 let HARD_TEST : Search.Settings = { BotLogic.HARD with maxNodes = 1_500; ttSize = 4093 };
 
 func settings(complexity : Text) : ?Search.Settings = if (complexity == "Hard") ?HARD_TEST else BotLogic.settingsFor(complexity);

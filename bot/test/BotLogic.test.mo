@@ -5,6 +5,8 @@
 //
 // Run: mops test
 import Array "mo:core/Array";
+import Char "mo:core/Char";
+import Nat32 "mo:core/Nat32";
 import Debug "mo:core/Debug";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
@@ -13,6 +15,7 @@ import VarArray "mo:core/VarArray";
 
 import TP "mo:duel-game-core";
 
+import Book "../src/Book";
 import BotLogic "../src/BotLogic";
 import Game "../src/GameTypes";
 import Rules "../src/GameRules";
@@ -20,7 +23,7 @@ import Search "../src/Search";
 
 // Hard's search with the interpreter's budget: the same code, shallower.
 let HARD_TEST : Search.Settings = { BotLogic.HARD with maxDepth = 5; maxNodes = 30_000; ttSize = 4093 };
-let never = func() : Bool = false;
+let never = func() : Nat = 0;
 
 // A board drawn as it stands: six rows, TOP row first, 'R' = Red (#p1),
 // 'Y' = Yellow (#p2), anything else empty.
@@ -191,14 +194,62 @@ expectOneOf("Hard stops a double threat", stopFork, ?HARD_TEST, [1, 4]);
 // The search proves the win the open three makes: Red, Yellow, Red.
 do {
   let r = BotLogic.searchCol(boardOf(["", "", "", "", " YY", " RR"]), #p1, HARD_TEST, 0, never);
-  assert r.col == 3 and r.score == Search.WIN - 3;
+  assert r.col == 3 and r.score == Search.WIN - 7; // with the game's 7th disc
 };
 // A won position stays won at every seed, and Hard takes the fastest win.
 do {
   let r = BotLogic.searchCol(rowWin, #p1, HARD_TEST, 0, never);
-  assert r.col == 3 and r.score == Search.WIN - 1;
+  assert r.col == 3 and r.score == Search.WIN - 7;
 };
 Debug.print("6. lookahead OK");
+
+// ── 6b. the book and the exact search ────────────────────────────────────
+// The board after a move string (columns, Red first).
+func played(moves : Text) : [?Game.Seat] {
+  var board = Array.repeat<?Game.Seat>(null, 42);
+  for (ch in moves.chars()) {
+    let col = (ch.toNat32() - 48).toNat();
+    let ?next = Rules.drop(board, col, Rules.toMove(board)) else Runtime.trap("bad move string " # moves);
+    board := next;
+  };
+  board;
+};
+func bits(moves : Text) : (Nat64, Nat64) {
+  let board = played(moves);
+  let seat = Rules.toMove(board);
+  let (cur, mask, _) = Search.fromCells(func i = switch (board[i]) { case (?s) ?(s == seat); case null null });
+  (cur, mask);
+};
+do {
+  // Red's first move: the centre, the only one that wins.
+  let (c0, m0) = bits("");
+  assert Book.lookup(c0, m0) == ?(3, true);
+  // An entry and its mirror image: Red 3 3 3 3 3 3 2 2 wins with 4, so
+  // the mirrored position (4 4 for 2 2) wins with 2.
+  let (c1, m1) = bits("33333322");
+  assert Book.lookup(c1, m1) == ?(4, true);
+  let (c2, m2) = bits("33333344");
+  assert Book.lookup(c2, m2) == ?(2, true);
+  // A position off the book's lines (Red never plays 0 first).
+  let (c3, m3) = bits("06");
+  assert Book.lookup(c3, m3) == null;
+  // Hard plays the book's move; Medium does not use the book.
+  assert pick(played("33333344"), ?HARD_TEST, 5) == 2;
+  assert BotLogic.searchCol(played(""), #p1, HARD_TEST, 0, never).exact == ?1;
+  // Book entries are legal moves wherever the book has one.
+  assert Book.size() > 1000;
+};
+// 27 discs, Yellow to move: a draw with perfect play, kept only by
+// column 5 (checked with an independent solver, tools/book/solve.c).
+let DRAWN = "560304312321311200253032125";
+let DRAWING = [5];
+do {
+  // The exact search proves the draw and plays the one drawing move.
+  let r = BotLogic.searchCol(played(DRAWN), Rules.toMove(played(DRAWN)), { HARD_TEST with maxNodes = 200_000; ttSize = 65_521 }, 0, never);
+  assert r.exact == ?0;
+  assert DRAWING.find(func c = c == r.col) != null;
+};
+Debug.print("6b. book and exact search OK");
 
 // ── 7. the request around the move ───────────────────────────────────────
 // Unknown complexities play Medium; a retry answers a plain legal move;

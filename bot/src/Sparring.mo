@@ -64,7 +64,7 @@ actor Sparring {
             lastStepDurationNs = null;
           },
           Nat64.fromIntWrap(Time.now()),
-          func() = InternetComputer.performanceCounter(0) > 1_200_000_000,
+          func() = InternetComputer.performanceCounter(0).toNat(),
         );
         await hostOf(host).duel_submit(tableId, g.gen, g.step, move);
       };

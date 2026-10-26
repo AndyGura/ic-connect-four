@@ -16,10 +16,6 @@ actor {
     unregister_bot : () -> async ();
   };
 
-  /// Hard stops deepening after this many instructions of one call: well
-  /// inside a query's limit, and about 0.0005 TC per move at most.
-  let SEARCH_INSTRUCTIONS : Nat64 = 1_200_000_000;
-
   // Called by frontends to challenge this bot.
   public shared func play(host : Principal.Principal, tableId : TP.TableId, seat : TP.Seat, code : ?Text, complexity : Text) : async TP.Res<TP.JoinOk> {
     let h : Host = actor (host.toText());
@@ -38,24 +34,28 @@ actor {
     await h.unregister_bot();
   };
 
+  // The instructions this message has executed so far: Hard's budget.
+  func clock() : Nat = InternetComputer.performanceCounter(0).toNat();
+
   public query func make_move(req : TP.MoveRequest<Game.View, Game.Action>) : async Game.Action {
-    BotLogic.chooseMove(req, Nat64.fromIntWrap(Time.now()), func() = InternetComputer.performanceCounter(0) > SEARCH_INSTRUCTIONS);
+    BotLogic.chooseMove(req, Nat64.fromIntWrap(Time.now()), clock);
   };
 
   /// What Hard (or `complexity`) would play here and how deep it saw:
   /// for checking the search's depth and cost on a live canister.
   public query func analyse(board : [?Game.Seat], seat : Game.Seat, complexity : Text) : async {
     col : Nat;
-    score : Int;
+    score : Int64;
     depth : Nat;
     nodes : Nat;
+    exact : ?Int;
     instructions : Nat64;
   } {
     let settings = switch (BotLogic.settingsFor(complexity)) {
       case (?s) s;
       case null BotLogic.HARD;
     };
-    let r = BotLogic.searchCol(board, seat, settings, Nat64.fromIntWrap(Time.now()), func() = InternetComputer.performanceCounter(0) > SEARCH_INSTRUCTIONS);
+    let r = BotLogic.searchCol(board, seat, settings, Nat64.fromIntWrap(Time.now()), clock);
     { r with instructions = InternetComputer.performanceCounter(0) };
   };
 
