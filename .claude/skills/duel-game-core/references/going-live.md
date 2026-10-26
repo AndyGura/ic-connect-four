@@ -101,8 +101,14 @@ identity new`, no `icp cycles`, no `icp deploy -e ic`: every canister
    It holds no token, and none ever goes into the repository: the next
    step adds it outside the session.
 
-2. At https://claude.ai/code creates an environment (or edits the
-   default one):
+2. Opens https://claude.ai/code in a browser (in the desktop app, its
+   **Code** tab, not the chat home) and, on a first visit, connects
+   GitHub for that repository. On the new-session screen, opens the
+   environment selector (the first control under the message box) and
+   either picks **New environment** or edits **Default** (the settings
+   icon on its row under **Cloud**). In a running session the same
+   dialog is the caret after the session title → **Edit cloud
+   environment**. In it:
    - **Network secrets** → **Add secret**: secret type **Bearer**, name
      `hosty.live`, allowed website `api.hosty.live`, and in the custom
      header row (`Authorization`, prefix `Bearer`) section 1's token as
@@ -118,11 +124,23 @@ identity new`, no `icp cycles`, no `icp deploy -e ic`: every canister
      `*.icp0.io`, `ic0.app`. hosty.live's tools answer with `curl`
      uploads to `api.hosty.live`; mops, icp-cli's mainnet reads and the
      play-test against a deployed backend talk to the others.
-   - **Setup script**:
+   - **Setup script**, which installs every tool before the session
+     starts (a binary fetched mid-session may be refused, and icp-cli
+     looks up its local network launcher on `api.github.com`, which
+     often turns a cloud VM's shared address away; this fetches it
+     through `github.com`):
 
      ```bash
      npm install -g @icp-sdk/icp-cli ic-mops
+     tag=$(curl -fsSIL -o /dev/null -w '%{url_effective}' https://github.com/dfinity/icp-cli-network-launcher/releases/latest)
+     tag=${tag##*/}
+     arch=$(uname -m | sed s/aarch64/arm64/)
+     mkdir -p /opt/icp-launcher
+     curl -fsSL "https://github.com/dfinity/icp-cli-network-launcher/releases/download/$tag/icp-cli-network-launcher-$arch-linux-$tag.tar.gz" | tar -xz --strip-components=1 -C /opt/icp-launcher
      ```
+
+   - **Environment variables**: `ICP_CLI_NETWORK_LAUNCHER_PATH=/opt/icp-launcher/icp-cli-network-launcher`,
+     so `icp network start` uses that launcher.
 
 3. Starts a session on that repository with that environment.
 
@@ -155,7 +173,13 @@ npx skills add research-ag/duel-core --skill duel-game-core -a claude-code -y --
 
 It lands in `.claude/skills/duel-game-core/`, which later sessions load
 by themselves; in this one, read its `SKILL.md` from there. Commit and
-push your work as you go: the VM keeps nothing.
+push your work as you go: the VM keeps nothing. A session pushes to a
+branch of its own (`claude/...`); once the game works, merge it into
+the default branch (or open a pull request there, as the user
+prefers), so the next session finds the game where it looks first.
+From the first deploy on, keep the repository's `CLAUDE.md`
+(`templates/CLAUDE.md.template`) current: the canister ids and what
+each one runs.
 
 **Deploy sessions from anywhere.** A `userAction` from
 `hosty_request_deploy_session` is approved in the hosty.live web app,
@@ -247,6 +271,10 @@ controller, which `register` requires: check the reply's `caller` is
 the user's principal. `unregister` takes `(principal "<backend-id>")`.
 
 Every later version is steps 1 to 5 again; the canister id stays.
+Before each, `cd frontend && node check-upgrade.mjs <backend-id>`
+checks the new module's stable types and Candid against the live one,
+and you review the code that runs on the upgrade
+(`changing-a-live-game.md`, section 4).
 
 ### The frontend
 
@@ -383,7 +411,11 @@ curl https://<backend-id>.raw.icp0.io/semantics
 
 `icp canister status frontend -e ic -i` is the page's id; the page is
 at `https://<frontend-id>.icp0.io/`. Later deploys of the same project
-upgrade the same canisters and keep the backend's tables. A canister's
+upgrade the same canisters. Before each one,
+`(cd frontend && node check-upgrade.mjs <backend-id>)` checks the new
+module's stable types and Candid against the live one, and you review
+the code that runs on the upgrade (`changing-a-live-game.md`, section
+4). A canister's
 balance shows in `icp canister status <name> -e ic`; topping it up is
 cycle.express again, with the canister id as the recipient, or `icp
 canister top-up <name> -e ic --amount 1t` from the identity's balance.

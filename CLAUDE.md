@@ -1,0 +1,39 @@
+# Connect Four
+
+A 2-player game on duel-game-core
+(https://github.com/research-ag/duel-core): `src/ConnectFourRules.mo`
+holds the rules, `src/Host.mo` the host actor, `frontend/` the page.
+Read `.claude/skills/duel-game-core/SKILL.md` before changing anything;
+for a change to the live game, its `references/changing-a-live-game.md`.
+
+## Live
+
+| Canister | Id                            | Runs                                         |
+| -------- | ----------------------------- | -------------------------------------------- |
+| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | the game; the module store has it            |
+| frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/ |
+
+Deployed through hosty.live (`going-live.md`). The live backend module
+predates bot support; this tree adds it, and the upgrade has not been
+deployed yet.
+
+## What the game runs
+
+- Mode: `#turnBased`.
+- Bot support (the Host's and the page's BOTS lines): on in this tree,
+  not yet on the live backend. The page's bot dialog is the game's own
+  `frontend/src/bots.js`.
+- Leaderboard: off.
+- A bot canister: none yet; any bot that calls `register_bot` is listed.
+- duel-game-core: `../duel-core/backend` (mops, a sibling clone of
+  research-ag/duel-core) and `@research-ag/duel-game-core` 0.4.0 (npm).
+
+## Working here
+
+- The default branch is the game: merge finished work there, and
+  update this file whenever a canister or a feature changes.
+- `mops test`; `cd frontend && npm run build && node play-test.mjs`.
+- Before upgrading the backend: `cd frontend && node check-upgrade.mjs
+  co6yk-kyaaa-aaaau-ahgea-cai` must exit 0.
+- A change to `View`, `Action`, `Options` or the rules updates
+  `SEMANTICS` in the same change.

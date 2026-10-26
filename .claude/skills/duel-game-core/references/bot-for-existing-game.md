@@ -174,7 +174,9 @@ table they opened.
 **Unit tests.** `test/BotLogic.test.mo` in the style of `SKILL.md`
 Step 5: from a handful of positions built by hand, `chooseMove` returns
 a move `GameRules` accepts, for every complexity, and the obvious tactical
-cases (take a win, block a loss) where the strategy claims them.
+cases (take a win, block a loss) where the strategy claims them. A
+bot that searches is tested at a shallow depth
+(`canister-player-bots.md`, "Testing a bot that searches").
 
 ```bash
 mops test
@@ -322,6 +324,28 @@ it goes up by either route of `going-live.md`:
   Always name `bot` on the deploy line: a bare `icp deploy -e ic` also
   attempts `backend` (which fails) and `sparring` (a paid canister with
   no use on mainnet).
+
+Then check the game lists the bot. `list_bots` is a query anybody may
+send; in a cloud session, which has no identity of its own, send it
+anonymously:
+
+```bash
+icp canister call <backend-id> list_bots '()' -n ic --query --identity anonymous
+```
+
+Write the bot's canister id into `README.md`, with how to build, test
+and update it: a cloud session keeps nothing, and the next one finds
+the canister there.
+
+**Every later version** is tested locally again (step 5), then upgrades
+the same canister, never a new one: through hosty.live,
+`hosty_prepare_wasm_upload` with the bot's canister id and
+`snapshotBeforeUpgrade: true`; with icp-cli, `icp deploy bot -e ic`
+again, after `icp canister link bot <bot-id> -e ic` when
+`.icp/data/mappings/ic.ids.json` has no `bot` entry (the bot went up
+through hosty.live, or from another checkout). A new canister would be
+paid for again and listed as a second bot. When the name or the complexities change, call `register` again
+and check `list_bots`.
 
 `register` lists the bot, under its name and complexities, in the
 game's bot directory (`list_bots`), where every frontend that shows

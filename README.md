@@ -53,9 +53,9 @@ whenever the bot is due to drop:
 `View` and `Action` are in `/semantics` and the backend's Candid.
 duel-game-core's skill walks through a bot for an already-deployed game
 (`.claude/skills/duel-game-core/references/bot-for-existing-game.md`,
-then `canister-player-bots.md`). Each bot level can sit at three tables
-at once (the framework's per-player limit); a fourth invitation is
-refused with "already playing 3 games". There is no leaderboard, so the
+then `canister-player-bots.md`). Each bot level can sit at 25 tables
+at once (the framework's limit for a canister player; a human's is 3); a
+26th invitation is refused with "already playing 25 games". There is no leaderboard, so the
 list shows no ratings.
 
 ## Canisters
