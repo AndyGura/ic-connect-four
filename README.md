@@ -26,8 +26,10 @@ frontend or bot at `https://<backend-id>.raw.icp0.io/semantics`.
 
 ## Bots
 
-The game ships no bot of its own: it seats any canister that registers
-with it, through duel-game-core's canister players.
+The game seats any canister that registers with it, through
+duel-game-core's canister players. `bot/` is one: a bot with three
+levels (Easy, Medium, Hard), built and tested against the live module;
+see `bot/README.md`.
 
 **Playing one.** "Challenge a bot" in the lobby lists every registered
 bot, once per level it plays; pick one and your colour, and a table opens
@@ -62,7 +64,7 @@ list shows no ratings.
 
 | Canister | Id                            |                                                                            |
 | -------- | ----------------------------- | -------------------------------------------------------------------------- |
-| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | module `29f5b4a2…`, in hosty.live's store, verified — predates bot support |
+| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | module `c9ed010f…`, in hosty.live's store, verified — with bot support     |
 | frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/                               |
 
 Both are controlled by the owner's hosty.live account. The game is
@@ -96,6 +98,7 @@ which would wipe its tables. Check both with `hosty_get_canister_status`.
 | `frontend/src/app.js`                 | Bootstrap: agent, transport, the default shell, and the wiring to the stage, the sound and the bots.            |
 | `frontend/play-test.mjs`              | Headless end-to-end test: two fresh players play whole games through the real client.                           |
 | `.claude/skills/duel-game-core/`      | The framework's skill, which Claude Code sessions on this repository load by themselves.                        |
+| `bot/`                                | A bot canister for the live game (Easy, Medium, Hard), with its own tests and `README.md`.                      |
 
 ## Build
 
@@ -108,8 +111,9 @@ cargo install ic-wasm --locked      # icp-cli's Motoko recipe calls it
 ```
 
 duel-game-core is not on mops.one yet, so `mops.toml` points at a clone
-of the framework next to this repository (built and tested against
-commit `37dad15`):
+of the framework next to this repository. With duel-core at commit
+`49e1503`, `icp build backend` reproduces the live module byte for byte
+(`c9ed010f…`):
 
 ```bash
 git clone https://github.com/research-ag/duel-core.git ../duel-core
