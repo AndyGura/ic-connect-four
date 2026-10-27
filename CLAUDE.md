@@ -29,7 +29,8 @@ upgrade. The live page carries the bot dialog since 2026-10-27.
 - Search and link previews: the page's title, description, canonical,
   Open Graph/Twitter tags and JSON-LD point at the cj766 URL, with
   `robots.txt`, `sitemap.xml`, a manifest and icons beside it. The PNGs
-  and `favicon.ico` come from `frontend/make-images.mjs`. Not live yet.
+  and `favicon.ico` come from `frontend/make-images.mjs`. Live since
+  2026-10-27.
 - A bot canister: `bot/` (Easy, Medium, Hard; its own `README.md`),
   live at `n5zoo-cqaaa-aaaau-ahhbq-cai` since 2026-10-27 and registered
   with the game. Any bot that calls `register_bot` is listed.
