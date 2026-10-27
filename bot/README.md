@@ -14,7 +14,7 @@ one of three levels:
 | Medium | Looks one move ahead: takes a win, blocks one, never drops right under a cell the opponent wins on, and makes a double threat when it has one. Otherwise it prefers the centre and threats on its own rows, picking at random among moves of about equal value. It does not see a double threat being built against it, so a player who plans two moves ahead beats it. |
 | Hard   | Perfect moves from an opening book (as Red, every line through the 14th disc), then an exact solver (win, draw or loss with perfect play) from the 12th disc on, and a deep heuristic search (12–14 plies in the middle game) wherever the solver runs out of budget. Red wins Connect Four with perfect play, and as Red Hard plays it; as Yellow it holds out and takes the first chance a slip gives it. |
 
-**Bot canister: not deployed yet.** Its id goes here once it is.
+**Bot canister: `n5zoo-cqaaa-aaaau-ahhbq-cai`**, registered with the live game as "Connect Four Bot" (2026-10-27).
 
 ## How Hard thinks, and what it costs
 

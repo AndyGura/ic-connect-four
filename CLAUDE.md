@@ -12,6 +12,7 @@ for a change to the live game, its `references/changing-a-live-game.md`.
 | -------- | ----------------------------- | -------------------------------------------- |
 | backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | the game; the module store has it            |
 | frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/ |
+| bot      | `n5zoo-cqaaa-aaaau-ahhbq-cai` | `bot/`, registered as "Connect Four Bot"     |
 
 Deployed through hosty.live (`going-live.md`). The live backend runs
 module `c9ed010f…da2c` since 2026-10-26, which this tree builds byte for
@@ -26,7 +27,8 @@ upgrade. The live page carries the bot dialog since 2026-10-27.
   `frontend/src/bots.js`.
 - Leaderboard: off.
 - A bot canister: `bot/` (Easy, Medium, Hard; its own `README.md`),
-  not deployed yet. Any bot that calls `register_bot` is listed.
+  live at `n5zoo-cqaaa-aaaau-ahhbq-cai` since 2026-10-27 and registered
+  with the game. Any bot that calls `register_bot` is listed.
 - duel-game-core: `../duel-core/backend` (mops, a sibling clone of
   research-ag/duel-core) and `@research-ag/duel-game-core` 0.4.0 (npm).
 
