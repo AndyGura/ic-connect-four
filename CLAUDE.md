@@ -14,9 +14,9 @@ for a change to the live game, its `references/changing-a-live-game.md`.
 | frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/ |
 
 Deployed through hosty.live (`going-live.md`). The live backend runs
-this tree's bot support since 2026-10-26 (module c9ed010f…, snapshot
-taken before the upgrade), and the live page carries the bot dialog
-since 2026-10-27.
+module `c9ed010f…da2c` since 2026-10-26, which this tree builds byte for
+byte (with duel-core at `49e1503`); a snapshot was taken before that
+upgrade. The live page carries the bot dialog since 2026-10-27.
 
 ## What the game runs
 
@@ -25,7 +25,8 @@ since 2026-10-27.
   and live, backend and page. The page's bot dialog is the game's own
   `frontend/src/bots.js`.
 - Leaderboard: off.
-- A bot canister: none yet; any bot that calls `register_bot` is listed.
+- A bot canister: `bot/` (Easy, Medium, Hard; its own `README.md`),
+  not deployed yet. Any bot that calls `register_bot` is listed.
 - duel-game-core: `../duel-core/backend` (mops, a sibling clone of
   research-ag/duel-core) and `@research-ag/duel-game-core` 0.4.0 (npm).
 

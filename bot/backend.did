@@ -1,0 +1,222 @@
+type View = 
+ record {
+   board: Board;
+   lastMove: opt LastMove;
+   winLine: vec nat;
+ };
+type Verdict = 
+ variant {
+   draw;
+   p1Wins;
+   p2Wins;
+ };
+type TableVisibility = 
+ variant {
+   code: text;
+   open;
+ };
+type TableView = 
+ variant {
+   awaitingRematch: record {
+                      gen: nat;
+                      openSeat: Seat;
+                    };
+   busy: record {secondsUntilTakeover: nat;};
+   debrief: record {
+              end: End;
+              finalGame: View;
+              gen: nat;
+              seat: Seat;
+              steps: nat;
+            };
+   endedByOther;
+   inGame:
+    record {
+      claimTimeoutSecs: nat;
+      claimWinAvailable: bool;
+      game: View;
+      gen: nat;
+      idleTimeoutSecs: nat;
+      mode: Mode;
+      oppSubmitted: bool;
+      seat: Seat;
+      secondsUntilClaimable: nat;
+      secondsUntilIdleReset: nat;
+      step: nat;
+      toMove: opt Seat;
+      youSubmitted: bool;
+    };
+   lobby: record {
+            p1Open: bool;
+            p2Open: bool;
+            resetAvailable: bool;
+          };
+   stagingYou:
+    record {
+      gen: nat;
+      reservedForPartner: bool;
+      seat: Seat;
+      visibility: TableVisibility;
+    };
+ };
+type TableSummary = 
+ record {
+   id: TableId;
+   options: Options;
+   p1Open: bool;
+   p1Session: opt PlayerId;
+   p2Open: bool;
+   p2Session: opt PlayerId;
+   protected: bool;
+   waitingSecs: nat;
+ };
+type TableResult = 
+ variant {
+   changed: Snapshot;
+   gone;
+   unchanged;
+ };
+type TableId = nat;
+type Snapshot = 
+ record {
+   rev: nat;
+   view: TableView;
+ };
+type Seat = 
+ variant {
+   p1;
+   p2;
+ };
+type Response = 
+ record {
+   body: blob;
+   headers: vec record {
+                  text;
+                  text;
+                };
+   status_code: nat16;
+ };
+type Res_1 = 
+ variant {
+   err: Err;
+   ok: JoinOk;
+ };
+type Res = 
+ variant {
+   err: Err;
+   ok;
+ };
+type Request = 
+ record {
+   body: blob;
+   headers: vec record {
+                  text;
+                  text;
+                };
+   method: text;
+   url: text;
+ };
+type Reply = 
+ variant {
+   err: Err;
+   view: Snapshot;
+ };
+type Principal = principal;
+type PlayerId = text;
+type Options = record {};
+type Mode = 
+ variant {
+   simultaneous;
+   turnBased;
+ };
+type LobbyResult = 
+ variant {
+   changed: record {
+              rev: nat;
+              tables: vec TableSummary;
+              yours: vec TableId;
+            };
+   unchanged;
+ };
+type LastMove = 
+ record {
+   col: nat;
+   row: nat;
+   seat: Seat;
+ };
+type JoinOk = 
+ variant {
+   staged: Seat;
+   started: Seat;
+ };
+type Err = 
+ variant {
+   alreadySubmitted;
+   badCode;
+   badOptions: text;
+   illegalMove: text;
+   noSuchTable;
+   notIdle: record {secondsLeft: nat;};
+   notOverdue: record {secondsLeft: nat;};
+   notSeated;
+   notYourTurn;
+   "reserved": record {secondsLeft: nat;};
+   seatTaken;
+   stale;
+   tooManyTables: record {max: nat;};
+   unauthorized;
+   wrongPhase: text;
+ };
+type End = 
+ variant {
+   aborted: Seat;
+   claimed: Seat;
+   finished: Verdict;
+ };
+type BotEntry = 
+ record {
+   complexities: vec BotComplexityEntry;
+   name: text;
+   "principal": Principal;
+ };
+type BotComplexityEntry = 
+ record {
+   complexity: text;
+   elo: opt int;
+ };
+type Board = vec opt Seat;
+type Action = variant {drop: record {col: nat;};};
+type Ack = 
+ variant {
+   err: Err;
+   ok: record {
+         rev: nat;
+         tableId: TableId;
+       };
+ };
+service : {
+  ack_ended_as_canister: (tableId: TableId) -> ();
+  claim_win_as_canister: (tableId: TableId, gen: nat) -> (Res);
+  duel_ack_ended: (tableId: TableId) -> (Ack);
+  duel_claim_win: (tableId: TableId, gen: nat) -> (Ack);
+  duel_create_table: (seat: Seat, visibility: TableVisibility, options:
+   Options) -> (Ack);
+  duel_join_table: (tableId: TableId, seat: Seat, code: opt text) -> (Ack);
+  duel_keep_alive: () -> (Res);
+  duel_leave: (tableId: TableId, gen: nat) -> (Ack);
+  duel_lobby: (rev: nat) -> (LobbyResult) query;
+  duel_rematch: (tableId: TableId) -> (Ack);
+  duel_reset: (tableId: TableId, gen: nat) -> (Ack);
+  duel_submit: (tableId: TableId, gen: nat, step: nat, action: Action) ->
+   (Reply);
+  duel_table: (tableId: TableId, rev: nat) -> (TableResult) query;
+  http_request: (req: Request) -> (Response) query;
+  join_table_as_canister: (id: TableId, seat: Seat, code: opt text,
+   complexity: text) -> (Res_1);
+  leave_as_canister: (tableId: TableId, gen: nat) -> (Res);
+  list_bots: () -> (vec BotEntry) query;
+  register_bot: (name: text, complexities: vec text) -> ();
+  reset_as_canister: (tableId: TableId, gen: nat) -> (Res);
+  unregister_bot: () -> ();
+}
+
