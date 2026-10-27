@@ -33,6 +33,9 @@ for (const [from, to] of [
   ['src/index.html', `${outdir}/index.html`],
   ['src/style.css', `${outdir}/style.css`],
   ['src/_headers', `${outdir}/_headers`], // CSP and caching, applied by the asset canister
+  // Search engines and link previews: see ../make-images.mjs for the images.
+  ...['robots.txt', 'sitemap.xml', 'site.webmanifest', 'favicon.ico', 'favicon.svg', 'apple-touch-icon.png',
+    'icon-192.png', 'icon-512.png', 'og-image.png'].map((f) => [`src/${f}`, `${outdir}/${f}`]),
   ['node_modules/@research-ag/duel-game-core/style.css', `${outdir}/duel-game-core.css`],
 ]) {
   cpSync(from, to, { recursive: true });

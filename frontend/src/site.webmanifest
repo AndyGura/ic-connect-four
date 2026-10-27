@@ -1,0 +1,14 @@
+{
+  "name": "Connect Four",
+  "short_name": "Connect Four",
+  "description": "Play Connect Four online: a free two-player game against a friend or a bot, running on the Internet Computer.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1022",
+  "theme_color": "#10142a",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
