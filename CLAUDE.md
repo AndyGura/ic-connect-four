@@ -15,14 +15,14 @@ for a change to the live game, its `references/changing-a-live-game.md`.
 
 Deployed through hosty.live (`going-live.md`). The live backend runs
 this tree's bot support since 2026-10-26 (module c9ed010f…, snapshot
-taken before the upgrade). The live page has not been re-uploaded with
-the bot dialog yet.
+taken before the upgrade), and the live page carries the bot dialog
+since 2026-10-27.
 
 ## What the game runs
 
 - Mode: `#turnBased`.
 - Bot support (the Host's and the page's BOTS lines): on in this tree
-  and on the live backend; the live page predates the bot dialog. The page's bot dialog is the game's own
+  and live, backend and page. The page's bot dialog is the game's own
   `frontend/src/bots.js`.
 - Leaderboard: off.
 - A bot canister: none yet; any bot that calls `register_bot` is listed.
