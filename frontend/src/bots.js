@@ -73,6 +73,7 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
       </button>`;
     return `
       <p>Your colour against <strong>${esc(label(bot))}</strong>:</p>
+      <p class="muted c4-bot-id">Bot canister: <code>${esc(bot.principalText)}</code></p>
       <div class="seats">${seat("p1", "drops first")}${seat("p2", "drops second")}</div>
       ${backToList}`;
   }
@@ -105,7 +106,13 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
         res = await botActor.play(backend, target.tableId, { [target.openSeat]: null }, target.code, bot.complexity);
       } catch (err) {
         console.error(err);
-        throw new Error(`${label(bot)} did not answer. It may be out of cycles or gone — try another bot.`);
+        // The bot passes on a reject from the backend it joins through, so
+        // the reject text says which canister failed and why.
+        const why = rejectText(err);
+        throw new Error(
+          `${label(bot)} (canister ${bot.principalText}) did not answer` +
+            (why ? `: ${why}` : `. It may be out of cycles or gone — try another bot.`),
+        );
       }
       if ("err" in res) throw new Error(playErrText(res.err, bot));
       remember({ principalText: bot.principalText, name: bot.name, complexity: bot.complexity, tableId: target.tableId });
@@ -189,6 +196,13 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
     if (state.status !== prev.status) track(state.status);
   });
   track(client.getState().status);
+}
+
+// The replica's reject text out of an agent error, without the request
+// details around it; "" when there is none.
+function rejectText(err) {
+  const m = /Reject text:\s*([\s\S]*?)\s*(?:Error code:|Call context:|$)/.exec(err?.message ?? "");
+  return m ? m[1].trim() : "";
 }
 
 // `stagingYou` as what `play` needs: the table, the seat left open, and
