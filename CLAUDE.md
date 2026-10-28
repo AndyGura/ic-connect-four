@@ -18,6 +18,9 @@ Deployed through hosty.live (`going-live.md`). The live backend runs
 module `c9ed010f…da2c` since 2026-10-26, which this tree builds byte for
 byte (with duel-core at `49e1503`); a snapshot was taken before that
 upgrade. The live page carries the bot dialog since 2026-10-27.
+The backend's freezing threshold is 30 days since 2026-10-28; at 365
+days a 128 MiB heap grow needed ~2.9 TC frozen and failed with IC0532
+despite ~2 TC on the canister. Keep it at 30 days.
 
 ## What the game runs
 
