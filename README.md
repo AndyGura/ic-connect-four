@@ -71,14 +71,18 @@ Both are controlled by the owner's hosty.live account. The game is
 unlisted until its frontend is registered on the
 [Duel dashboard](https://n6plc-4yaaa-aaaaj-qshia-cai.icp.net/).
 
-**Cycles and the freezing threshold.** Both canisters were created with
-a 365-day freezing threshold, and on their subnet that made the
-frontend refuse to grow its memory (`IC0532`, "cannot grow memory … due
-to insufficient cycles") however much it was topped up. Resetting it in
-the hosty.live web app set 30 days, and it worked at once. The backend
-still has 365 days: if its update calls ever fail with `IC0532`, lower
-its freezing threshold rather than adding cycles, and don't reset it,
-which would wipe its tables. Check both with `hosty_get_canister_status`.
+**Cycles and the freezing threshold.** Both canisters were created on
+2026-10-22, the day before hosty.live switched new canisters from a
+365-day to a 30-day freezing threshold. On their subnet 365 days made
+memory grows fail (`IC0532`, "cannot grow memory … due to insufficient
+cycles") however much was topped up: the frontend's on its first upload,
+the backend's on 2026-10-28 at ~2 TC. Both now have 30 days (the
+frontend since a reset in the hosty.live web app, the backend since
+2026-10-28 via `update_settings`). Keep it there; if `IC0532` comes
+back, lower the threshold rather than adding cycles, and never reset the
+backend, which would wipe its tables. hosty's status proxy can show the
+old value for a while after a change; `canister_status` signed by the
+owner is authoritative.
 
 ## Layout
 
