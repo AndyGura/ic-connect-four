@@ -844,3 +844,8 @@ body.bots-open #screen {
     animation: none !important;
   }
 }
+
+.c4-bot-id {
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
