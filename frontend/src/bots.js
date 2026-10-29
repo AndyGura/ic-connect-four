@@ -44,6 +44,15 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
     pending = null;
   }
 
+  // The library's bot rows, one bot at a time, each under its canister id
+  // so players can see and copy which canister they are about to play.
+  function renderBots(bots) {
+    if (bots.length === 0) return renderBotList(bots, plugin);
+    return bots
+      .map((b) => `<div class="c4-bot">${botId(b.principal.toString())}${renderBotList([b], plugin)}</div>`)
+      .join("");
+  }
+
   const backToList = `<p><button type="button" class="ghost" data-bots-list>Back to the bots</button></p>`;
 
   async function showList() {
@@ -55,7 +64,7 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
       const intro = staging
         ? `Pick a bot to take the open seat at your table.`
         : `Pick a bot and your colour; a table opens for the two of you.`;
-      body.innerHTML = `<p class="muted">${intro}</p>${renderBotList(bots, plugin)}`;
+      body.innerHTML = `<p class="muted">${intro}</p>${renderBots(bots)}`;
     } catch (err) {
       console.error(err);
       if (!panel.hidden) body.innerHTML = `<p class="error">Could not load the bots.</p>${backToList}`;
@@ -73,7 +82,7 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
       </button>`;
     return `
       <p>Your colour against <strong>${esc(label(bot))}</strong>:</p>
-      <p class="muted c4-bot-id">Bot canister: <code>${esc(bot.principalText)}</code></p>
+      ${botId(bot.principalText)}
       <div class="seats">${seat("p1", "drops first")}${seat("p2", "drops second")}</div>
       ${backToList}`;
   }
@@ -170,6 +179,11 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
   });
   document.getElementById("bot-challenge-back").addEventListener("click", close);
   body.addEventListener("click", (ev) => {
+    const copyBtn = ev.target.closest("[data-copy-principal]");
+    if (copyBtn) {
+      void copyText(copyBtn);
+      return;
+    }
     const botBtn = ev.target.closest("[data-challenge-bot]");
     if (botBtn) {
       choose({
@@ -196,6 +210,43 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
     if (state.status !== prev.status) track(state.status);
   });
   track(client.getState().status);
+}
+
+// A bot's canister id with a Copy button. The id itself is select-all on
+// tap or click too, for browsers without clipboard access.
+function botId(principalText) {
+  const p = esc(principalText);
+  return `
+      <p class="c4-bot-id">
+        <span class="muted">Bot canister</span>
+        <code class="c4-bot-principal">${p}</code>
+        <button type="button" class="ghost c4-copy" data-copy-principal="${p}">Copy</button>
+      </p>`;
+}
+
+async function copyText(btn) {
+  const text = btn.dataset.copyPrincipal;
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch (_) {
+    const code = btn.parentElement?.querySelector(".c4-bot-principal");
+    if (code) {
+      const range = document.createRange();
+      range.selectNodeContents(code);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try {
+        ok = document.execCommand("copy");
+      } catch (_) {}
+    }
+  }
+  btn.textContent = ok ? "Copied" : "Select and copy";
+  setTimeout(() => {
+    btn.textContent = "Copy";
+  }, 1500);
 }
 
 // The replica's reject text out of an agent error, without the request
