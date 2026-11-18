@@ -15,16 +15,29 @@ for a change to the live game, its `references/changing-a-live-game.md`.
 | bot      | `n5zoo-cqaaa-aaaau-ahhbq-cai` | `bot/`, registered as "Connect Four Bot"     |
 
 Deployed through hosty.live (`going-live.md`). The live backend runs
-module `c9ed010f…da2c` since 2026-10-26, which this tree builds byte for
-byte (with duel-core at `49e1503`); a snapshot was taken before that
-upgrade. The live page carries the bot dialog since 2026-10-27.
+module `1bd622e9…130a` since 2026-11-18, which this tree builds byte for
+byte (with duel-core at `cd3f163`); hosty snapshot
+`000000000000000200000000028039880101` was taken before that upgrade. The
+live page carries invite links since 2026-11-18.
 The backend's freezing threshold is 30 days since 2026-10-28; at 365
 days a 128 MiB heap grow needed ~2.9 TC frozen and failed with IC0532
 despite ~2 TC on the canister. Keep it at 30 days.
+Keep the backend at 1 TC or more: on 2026-11-18 it had sunk to 0.32 TC,
+its sweep timer had stalled (~0.48 TC with 256 MiB) and it refused every
+update (IC0207); it was topped up to 1.12 TC. The 269 MB snapshot raises
+its idle burn from ~8.6 to ~14.6 B cycles a day.
 
 ## What the game runs
 
 - Mode: `#turnBased`.
+- Sweep timer: lazy (`sweeper = Transport.sweeper()` in the Host's
+  `env`, duel-core #56/#57): it runs only while there is a table or a
+  waiting player, so `canister_version` in `/metrics` stays flat while
+  nobody plays.
+- Invite links: on in this tree and live. A private table is an invite
+  (`#t=<table>&c=<code>`, shared from the waiting screen); the bot
+  dialog's Share links (`#new&b=…`) are followed by `bots.js`. The
+  player is kept per browser (duel-game-core 0.5.x).
 - Bot support (the Host's and the page's BOTS lines): on in this tree
   and live, backend and page. The page's bot dialog is the game's own
   `frontend/src/bots.js`.
@@ -38,7 +51,9 @@ despite ~2 TC on the canister. Keep it at 30 days.
   live at `n5zoo-cqaaa-aaaau-ahhbq-cai` since 2026-10-27 and registered
   with the game. Any bot that calls `register_bot` is listed.
 - duel-game-core: `../duel-core/backend` (mops, a sibling clone of
-  research-ag/duel-core) and `@research-ag/duel-game-core` 0.4.0 (npm).
+  research-ag/duel-core, at `cd3f163`) and `@research-ag/duel-game-core`
+  0.5.1 (npm). Built with the Motoko recipe v5.1.0 (entry point in
+  `mops.toml`).
 
 ## Working here
 

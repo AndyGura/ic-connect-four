@@ -93,8 +93,9 @@ npm install -g @icp-sdk/icp-cli ic-mops @icp-sdk/ic-wasm
 ```
 
 duel-game-core is not on mops.one, so `mops.toml` points at a clone of
-the framework two levels up (this bot was built against commit
-`49e1503`):
+the framework two levels up (the live bot was built against commit
+`49e1503`; its tests also pass against `cd3f163`, which the game builds
+with since 2026-11-18):
 
 ```bash
 git clone https://github.com/research-ag/duel-core.git ../../duel-core   # from bot/
@@ -111,7 +112,7 @@ mops test                            # unit checks, then whole games through the
 `test/WholeGames.test.mo` runs the game's own rules
 (`../src/ConnectFourRules.mo` of this repository) and duel-game-core's
 engine in the interpreter: this repository's game source, with
-duel-core at `49e1503`, builds into the live module byte for byte, so
+duel-core at `cd3f163`, builds into the live module byte for byte, so
 these are the live game's rules and engine. Every level plays from both
 seats against every level; every game must reach its real ending with
 the bot answering every ask at the first try.

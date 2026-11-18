@@ -21,6 +21,15 @@ again to drop), with the column buttons in the panel, or with the keys
 1–7 (← → to aim, Enter or ↓ to drop). The music and sound-effect toggles
 sit in the header and are remembered per browser.
 
+**Playing a friend.** In the lobby, "Invite a friend" opens a private
+table, and its "Share invite link" button hands the link to a phone's
+share sheet (WhatsApp, Signal, …) or copies it on a desktop. Opening the
+link takes the free seat. An invite table waits 30 minutes for the
+friend, even while its creator is in another app, and each seat's first
+move gets 10 more minutes before the other may claim the win. Your player
+is kept per browser: to play the other seat yourself, use another browser
+or a private window.
+
 The backend publishes the full rules for anyone building their own
 frontend or bot at `https://<backend-id>.raw.icp0.io/semantics`.
 
@@ -34,8 +43,10 @@ see `bot/README.md`.
 **Playing one.** "Challenge a bot" in the lobby lists every registered
 bot, once per level it plays; pick one and your colour, and a table opens
 for the two of you. While waiting at a table of your own, "Add a bot to
-the open seat" fills it instead (an access-code table included). A
-Rematch re-invites the same bot at the same level by itself.
+the open seat" fills it instead (an invite table included). A
+Rematch re-invites the same bot at the same level by itself. Each bot row
+has a Share button: its link (`#new&b=<bot>:<level>`) opens a table with
+that bot for whoever follows it.
 
 **Writing one.** A bot is a canister of its own that the backend calls
 whenever the bot is due to drop:
@@ -64,7 +75,7 @@ list shows no ratings.
 
 | Canister | Id                            |                                                                            |
 | -------- | ----------------------------- | -------------------------------------------------------------------------- |
-| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | module `c9ed010f…`, in hosty.live's store, verified — with bot support     |
+| backend  | `co6yk-kyaaa-aaaau-ahgea-cai` | module `1bd622e9…`, in hosty.live's store, verified — with bot support     |
 | frontend | `cj766-haaaa-aaaau-ahgeq-cai` | https://cj766-haaaa-aaaau-ahgeq-cai.icp0.io/                               |
 
 Both are controlled by the owner's hosty.live account. The game is
@@ -83,6 +94,15 @@ back, lower the threshold rather than adding cycles, and never reset the
 backend, which would wipe its tables. hosty's status proxy can show the
 old value for a while after a change; `canister_status` signed by the
 owner is authoritative.
+
+**Keep the backend at 1 TC or more.** Its idle burn (about 14.6 B cycles
+a day with the 269 MB snapshot from the 2026-11-18 upgrade, 8.6 B
+without) sets the 30-day freezing reserve, about 0.44 TC. With 256 MiB of
+heap its sweep timer stalls near 0.48 TC; at 0.32 TC, on 2026-11-18, it
+refused every update ("out of cycles", `IC0207`) until a top-up. Since
+that day the sweep timer runs only while there is a table or a waiting
+player (duel-core's lazy sweeper), so an idle game spends nothing on it:
+`canister_version` in `/metrics` stays flat while nobody plays.
 
 ## Layout
 
@@ -116,8 +136,8 @@ cargo install ic-wasm --locked      # icp-cli's Motoko recipe calls it
 
 duel-game-core is not on mops.one yet, so `mops.toml` points at a clone
 of the framework next to this repository. With duel-core at commit
-`49e1503`, `icp build backend` reproduces the live module byte for byte
-(`c9ed010f…`):
+`cd3f163`, `icp build backend` (the Motoko recipe v5.1.0, entry point in
+`mops.toml`) reproduces the live module byte for byte (`1bd622e9…`):
 
 ```bash
 git clone https://github.com/research-ag/duel-core.git ../duel-core
@@ -136,15 +156,21 @@ icp deploy                           # both canisters, locally; prints the page'
 (cd frontend && node play-test.mjs)  # whole games, a rematch and a leave, via the real client
 ```
 
+In a Claude Code cloud session, `icp network start` needs its launcher
+from `ghcr.io`, which redirects to `pkg-containers.githubusercontent.com`:
+the environment must allow both (the skill's
+`references/cloud-session.md` has the setup script).
+
 `play-test.mjs` plays a full game with two fresh identities, every move
 taken from the plugin's own column buttons, tries one illegal move, then
 a rematch, a leave and both debriefs. Against a deployed backend:
 `node play-test.mjs <backend-id> --ic`.
 
-`browser-test.mjs` checks the page itself in two headless Chromium tabs:
-a protected table, a game played with every input (keys, a click on the
-3D board, arrow-key aiming, the column buttons) to Red's win, both 3D
-boards settled on the real position, then a rematch and a forfeit. It
+`browser-test.mjs` checks the page itself in two headless Chromium
+browsers: an invite table joined by its shared link, a game played with
+every input (keys, a click on the 3D board, arrow-key aiming, the column
+buttons) to Red's win, both 3D boards settled on the real position, a
+rematch and a forfeit, then a bot's shared link followed into a game. It
 needs Playwright (`npm i -D playwright && npx playwright install
 chromium`):
 
@@ -167,10 +193,9 @@ hosty.live web app. Each install is approved once in a hosty.live deploy
 session.
 
 Backend — upgrade in place, keeping its tables, with a snapshot to roll
-back to. Bot support only adds stable fields (the bot directory), so the
-upgrade from the live module keeps every table; check any later change
-with `moc --stable-compatible` against the live module's
-`motoko:stable-types` before installing:
+back to. Before installing, `cd frontend && node check-upgrade.mjs
+co6yk-kyaaa-aaaau-ahgea-cai` must exit 0 (stable types and Candid against
+the live module):
 
 ```bash
 icp build backend
@@ -195,3 +220,10 @@ true, outputDir: "dist" }`, run its `curl` from `frontend/`, and
 
 Finally `(cd frontend && node play-test.mjs <backend-id> --ic)` against
 the live backend.
+
+If the `curl` uploads answer `401 Invalid or revoked API token`, the
+environment's network secret for `api.hosty.live` holds a revoked token
+and replaces the upload token. Install from a public URL instead: commit
+the file, then `hosty_install_wasm_url` (backend) or `hosty_deploy_url`
+with `pureAssets: true` (a zip of `dist/`, page) on its commit-pinned
+`raw.githubusercontent.com` URL, as on 2026-11-18.

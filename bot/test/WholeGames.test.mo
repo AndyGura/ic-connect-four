@@ -1,7 +1,7 @@
 // Whole games of the bot through the game's real engine and rules. This
 // repository's src/ConnectFourRules.mo, with duel-core at the commit in
 // README.md, builds byte for byte into the live module
-// (c9ed010f…da2c), so the engine here (Registry + canister_players +
+// (1bd622e9…130a), so the engine here (Registry + canister_players +
 // those rules, as the Host wires them) is the live game's own code, run in
 // the interpreter instead of a replica. A "sparring" player takes the
 // other seat; the bot is asked for every drop it is due and its reply is
