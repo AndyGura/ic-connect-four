@@ -10,5 +10,8 @@ duel-game-core = "../duel-core/backend"
 core = "2.6.2"
 promtracker = "1.0.2" # metrics at GET /metrics, wired by the Host template
 
+[canisters]
+backend = "src/Host.mo"
+
 [toolchain]
 moc = "2.0.0"

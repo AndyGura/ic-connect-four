@@ -30,15 +30,17 @@ actor {
   let bots = CanisterPlayers.newStore(); // the bot directory and in-flight asks — stable
 
   // The function values the framework calls: the rules and the call that
-  // asks a seated bot for its move. No leaderboard. Rebuilt on every
-  // upgrade.
+  // asks a seated bot for its move (no leaderboard), and the sweep timer,
+  // which runs only while there is a table or a waiting player. Rebuilt
+  // on every upgrade.
   transient let env : Transport.Env<Rules.State, Rules.Action, Rules.View, Rules.Options> = {
     spec = Rules.spec;
     bots = ?{ store = bots; call = BotIface.callBot };
     scoring = null;
+    sweeper = Transport.sweeper();
   };
 
-  // Every method that names none of the game's types, and the sweep timer.
+  // Every method that names none of the game's types.
   include TransportActorMixin<system>(duel.lobby(env));
 
   // The four methods whose Candid types name the game's own types.
