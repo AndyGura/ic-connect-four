@@ -6,16 +6,27 @@
 // `play(backend, table, seat, code, level)`, which seats it through the
 // backend's `join_table_as_canister`; from then on the backend asks the bot
 // for every drop it is due. See duel-game-core's frontend README, "Bot
-// registry".
+// registry". A bot row's Share hands out a link to a game against that bot
+// (`#new&b=<principal>:<level>`), which this dialog follows; `start()`
+// follows every other link (README, "Links").
 
 import { Actor } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { buildBotPlayIdlFactory } from "@research-ag/duel-game-core/idl.js";
-import { atTableOf, errText, viewOf } from "@research-ag/duel-game-core/client.js";
+import { watchLinks } from "@research-ag/duel-game-core/app.js";
+import { shareBotLink } from "@research-ag/duel-game-core/bots.js";
+import {
+  LEAVE_FIRST_MESSAGE,
+  atTableOf,
+  errText,
+  followLink,
+  isSeated,
+  viewOf,
+} from "@research-ag/duel-game-core/client.js";
 import { botDisplayName, esc, renderBotList, tag } from "@research-ag/duel-game-core/render.js";
 
 // The last bot this tab seated, and at which table: a Rematch there
-// re-invites it. Per tab, like the session itself.
+// re-invites it. Per tab: only the tab that invited the bot re-invites it.
 const LAST_BOT_KEY = "c4-last-bot";
 
 const chip = (seat) => `<span class="c4-chip c4-chip-${seat}" aria-hidden="true"></span>`;
@@ -179,6 +190,7 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
   });
   document.getElementById("bot-challenge-back").addEventListener("click", close);
   body.addEventListener("click", (ev) => {
+    if (shareBotLink(ev.target, client)) return;
     const copyBtn = ev.target.closest("[data-copy-principal]");
     if (copyBtn) {
       void copyText(copyBtn);
@@ -210,6 +222,29 @@ export function createBotChallenge({ actor, agent, backendId, client, plugin }) 
     if (state.status !== prev.status) track(state.status);
   });
   track(client.getState().status);
+
+  // A link to a game against a bot: a table opens with the player at the
+  // link's seat and the bot is invited to the other, as from the dialog.
+  watchLinks(
+    (l) => l.kind === "new" && l.bot !== null,
+    (l) =>
+      void followLink(client, l, {
+        challenge: async (linked, seat) => {
+          const listed = await actor.list_bots().catch(() => []);
+          const name = listed.find((b) => b.principal.toString() === linked.principal)?.name ?? linked.principal;
+          // The player may have sat down meanwhile: the bot would take
+          // that table instead.
+          if (isSeated(client.getState().status)) {
+            client.showError(LEAVE_FIRST_MESSAGE);
+            return false;
+          }
+          const bot = { principalText: linked.principal, name, complexity: linked.complexity, seat };
+          pending = bot;
+          await invite(bot, null);
+          return true;
+        },
+      }),
+  );
 }
 
 // A bot's canister id with a Copy button. The id itself is select-all on

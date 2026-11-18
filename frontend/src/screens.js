@@ -24,8 +24,7 @@ function browsing(v, plugin) {
       <div class="option-group">
         <span class="option-group-label">Who may join</span>
         <label><input type="radio" name="table-visibility" value="open" checked /> Anyone</label>
-        <label><input type="radio" name="table-visibility" value="code" /> A friend with the access code</label>
-        <input type="text" id="create-code" class="table-code-input" placeholder="access code" hidden />
+        <label><input type="radio" name="table-visibility" value="code" /> Invite a friend — a private table you share by link</label>
       </div>
       <div class="seats">
         ${seatBtn("p1", "drops first")}

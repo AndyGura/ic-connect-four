@@ -1,10 +1,12 @@
 // Browser check for Connect Four, beside play-test.mjs: two Chromium tabs
 // play through the real page — app.js, the default shell, the 3D stage —
-// against a live backend. Red creates a protected table, Yellow joins with
-// its code; Red plays by keyboard, a click on the 3D board and arrow-key
-// aiming, Yellow by keys and the panel's column buttons, until Red's
-// vertical four. Both 3D boards must settle on the real position (the
-// stage publishes it as `#stage[data-board]`), then a rematch and a leave.
+// against a live backend. Red opens an invite table and shares its link,
+// Yellow joins by opening that link; Red plays by keyboard, a click on the
+// 3D board and arrow-key aiming, Yellow by keys and the panel's column
+// buttons, until Red's vertical four. Both 3D boards must settle on the
+// real position (the stage publishes it as `#stage[data-board]`), then a
+// rematch and a leave. Last, Red shares a bot from the bot dialog and
+// follows that link, which must seat the bot and start a game.
 // Run from frontend/ after `npm run build`:
 //
 //   node browser-test.mjs https://<frontend-id>.icp0.io/   # a deployed page
@@ -82,12 +84,31 @@ const browser = await chromium.launch({
 });
 const errors = [];
 
-async function open(name, viewport) {
-  const page = await (await browser.newContext({ viewport })).newPage();
+// Each page is its own browser (context), so its own player.
+async function open(name, viewport, url = pageUrl) {
+  const context = await browser.newContext({ viewport, permissions: ["clipboard-write"] });
+  const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(`${name}: ${e}`));
   page.on("console", (m) => m.type() === "error" && errors.push(`${name}: ${m.text()}`));
-  await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 120_000 });
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120_000 });
   return page;
+}
+
+// Clicks a share button (a desktop copies the link) and returns the link
+// it copied, caught on its way to the clipboard: the page's own
+// Permissions-Policy allows writing the clipboard, not reading it.
+async function sharedLink(page, selector) {
+  await page.evaluate(() => {
+    const write = navigator.clipboard.writeText.bind(navigator.clipboard);
+    window.__copied = null;
+    navigator.clipboard.writeText = (text) => {
+      window.__copied = text;
+      return write(text);
+    };
+  });
+  await page.click(selector);
+  await page.waitForFunction(() => window.__copied !== null, null, { timeout: 30_000 });
+  return page.evaluate(() => window.__copied);
 }
 
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) });
@@ -124,20 +145,15 @@ try {
   console.log(`browser-test against ${pageUrl}`);
   const red = await open("red", { width: 900, height: 600 });
   await red.waitForSelector("text=Pull up a chair", { timeout: 120_000 });
-  const code = `bt${Math.floor(Math.random() * 1e9)}`;
   await red.check('input[name="table-visibility"][value="code"]');
-  await red.fill("#create-code", code);
   await red.click('button[data-create-table="p1"]');
   await red.waitForSelector("text=Waiting for an opponent", { timeout: 120_000 });
   const id = (await red.locator(".table-badge").innerText()).match(/#(\d+)/)[1];
-  console.log(`  red: created protected table ${id}`);
+  const code = (await red.locator(".table-code").innerText()).trim();
+  const invite = await sharedLink(red, "[data-share-invite]");
+  expect("red's invite link", invite, `#t=${id}&c=${encodeURIComponent(code)}`);
 
-  const yellow = await open("yellow", { width: 390, height: 760 });
-  const seat = `button[data-join-table-id="${id}"][data-join-table="p2"]`;
-  await yellow.waitForSelector(seat, { timeout: 120_000 });
-  await yellow.click(seat);
-  await yellow.fill(".duel-code-input", code);
-  await yellow.click("[data-code-join]");
+  const yellow = await open("yellow", { width: 390, height: 760 }, invite);
 
   await myTurn(red);
   await red.keyboard.press("4"); // key: column 4
@@ -207,6 +223,27 @@ try {
   await yellow.waitForSelector("text=Your opponent walked away", { timeout: 120_000 });
   console.log("  rematch started; red forfeited; yellow saw the walk-away");
   await yellow.click("button[data-leave]");
+  await red.waitForSelector(".verdict", { timeout: 120_000 });
+  await red.click("button[data-leave]"); // back to the lobby
+
+  // A bot's Share link, followed: a table opens and the bot takes the seat.
+  await red.waitForSelector("text=Pull up a chair", { timeout: 120_000 });
+  await red.click("[data-open-bots]");
+  const shareBot = await red.waitForSelector("[data-share-bot]", { timeout: 120_000 }).catch(() => null);
+  if (shareBot === null) {
+    console.log("  no bot registered with this backend: bot links not checked");
+  } else {
+    const botLink = await sharedLink(red, "[data-share-bot]");
+    expect("red's bot link", botLink, "#new&b=");
+    await red.click("#bot-challenge-back");
+    await red.goto(botLink, { waitUntil: "domcontentloaded" }); // only the fragment changes
+    await myTurn(red);
+    console.log("  red followed the bot link: the bot took the seat and the game started");
+    await red.click("button[data-leave]");
+    await red.click("[data-confirm-yes]");
+    await red.waitForSelector(".verdict", { timeout: 120_000 });
+    await red.click("button[data-leave]");
+  }
   if (errors.length) throw new Error(`page errors:\n${errors.join("\n")}`);
   console.log("BROWSER-TEST PASSED");
 } catch (e) {
